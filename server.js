@@ -180,7 +180,7 @@ app.get('/api/registrations', async (req, res) => {
 // Start
 initDB()
   .then(() => {
-    const server = app.listen(PORT, () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`Red Maple Movement running on port ${PORT}`);
     });
 
