@@ -79,6 +79,23 @@ async function initDB() {
     CREATE INDEX IF NOT EXISTS IDX_user_sessions_expire ON user_sessions (expire);
   `);
 
+  // Waivers table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS waivers (
+      id              TEXT PRIMARY KEY,
+      user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      first_name      TEXT NOT NULL,
+      last_name       TEXT NOT NULL,
+      email           TEXT NOT NULL,
+      phone           TEXT NOT NULL DEFAULT '',
+      emergency_name  TEXT NOT NULL DEFAULT '',
+      emergency_phone TEXT NOT NULL DEFAULT '',
+      health_conditions TEXT NOT NULL DEFAULT '',
+      signature_data  TEXT NOT NULL,
+      signed_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
   // Seed sample data if empty
   const { rows } = await pool.query('SELECT COUNT(*) AS n FROM classes');
   if (parseInt(rows[0].n) === 0) {
@@ -381,6 +398,63 @@ async function main() {
         class: r.title ? { title: r.title, date: r.date, time: r.time, instructor: r.instructor } : null
       }));
       res.json(enriched);
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Waiver routes
+  app.post('/api/waiver', async (req, res) => {
+    const { firstName, lastName, email, phone, emergencyName, emergencyPhone, healthConditions, signatureData } = req.body;
+    if (!firstName || !lastName || !email || !signatureData)
+      return res.status(400).json({ error: 'Missing required fields.' });
+    const userId = req.isAuthenticated() ? req.user.id : null;
+    try {
+      // Check for existing waiver by email
+      const { rows: existing } = await pool.query(
+        'SELECT id, signed_at FROM waivers WHERE LOWER(email) = LOWER($1)', [email]
+      );
+      if (existing.length > 0) {
+        // Update existing waiver
+        await pool.query(`
+          UPDATE waivers SET first_name=$1, last_name=$2, phone=$3, emergency_name=$4,
+            emergency_phone=$5, health_conditions=$6, signature_data=$7, signed_at=NOW(),
+            user_id=COALESCE($8, user_id)
+          WHERE LOWER(email) = LOWER($9)`,
+          [firstName, lastName, phone||'', emergencyName||'', emergencyPhone||'', healthConditions||'', signatureData, userId, email]
+        );
+        const { rows } = await pool.query('SELECT * FROM waivers WHERE LOWER(email) = LOWER($1)', [email]);
+        return res.json({ success: true, waiver: rows[0] });
+      }
+      const id = Date.now().toString();
+      await pool.query(`
+        INSERT INTO waivers (id, user_id, first_name, last_name, email, phone, emergency_name, emergency_phone, health_conditions, signature_data)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [id, userId, firstName, lastName, email.toLowerCase(), phone||'', emergencyName||'', emergencyPhone||'', healthConditions||'', signatureData]
+      );
+      const { rows } = await pool.query('SELECT * FROM waivers WHERE id = $1', [id]);
+      res.status(201).json({ success: true, waiver: rows[0] });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  app.get('/api/waiver/my', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not signed in.' });
+    try {
+      const { rows } = await pool.query(
+        'SELECT id, first_name, last_name, email, phone, emergency_name, emergency_phone, health_conditions, signature_data, signed_at FROM waivers WHERE user_id = $1 ORDER BY signed_at DESC LIMIT 1',
+        [req.user.id]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'No waiver found.' });
+      res.json({ waiver: rows[0] });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  app.get('/api/waivers', async (req, res) => {
+    const { password } = req.query;
+    if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Invalid password' });
+    try {
+      const { rows } = await pool.query(
+        'SELECT id, first_name, last_name, email, phone, emergency_name, emergency_phone, health_conditions, signed_at FROM waivers ORDER BY signed_at DESC'
+      );
+      res.json(rows);
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 

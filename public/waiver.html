@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Participant Waiver — Red Maple Movement</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .waiver-layout { max-width: 780px; margin: 0 auto; padding: 40px 5% 80px; }
+
+    /* Already-signed banner */
+    .signed-banner {
+      background: #f0f7f0;
+      border: 1.5px solid #a8d5a8;
+      border-radius: var(--radius);
+      padding: 1.5rem 2rem;
+      margin-bottom: 2rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .signed-banner-icon { font-size: 2rem; flex-shrink: 0; }
+    .signed-banner h3 { font-size: 1.1rem; margin-bottom: 0.25rem; color: #2d6a2d; }
+    .signed-banner p  { font-size: 0.88rem; color: #3a5a3a; margin: 0; }
+    .signed-banner .btn { margin-top: 0.75rem; }
+
+    /* Waiver document box */
+    .waiver-doc {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem 2.5rem;
+      max-height: 480px;
+      overflow-y: scroll;
+      font-size: 0.88rem;
+      line-height: 1.75;
+      color: var(--charcoal);
+      margin-bottom: 1rem;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .waiver-doc h2 { font-size: 1.1rem; text-align: center; margin-bottom: 0.25rem; }
+    .waiver-doc .studio-name { text-align: center; font-size: 1rem; font-weight: 700; color: var(--red); margin-bottom: 1.5rem; font-family: 'Playfair Display', serif; }
+    .waiver-doc h3 { font-size: 0.9rem; font-weight: 700; margin: 1.25rem 0 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .waiver-doc p  { margin-bottom: 0.75rem; }
+    .waiver-doc ul { margin: 0.5rem 0 0.75rem 1.25rem; }
+    .waiver-doc ul li { margin-bottom: 0.3rem; }
+    .waiver-doc strong { color: var(--charcoal); }
+    .waiver-doc .caps { text-transform: uppercase; font-weight: 700; font-size: 0.82rem; background: #fff8f7; border: 1px solid var(--red-lt); border-radius: 6px; padding: 0.75rem 1rem; margin: 1rem 0; }
+
+    .scroll-prompt {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--mid);
+      margin-bottom: 1.5rem;
+    }
+    .scroll-prompt.done { color: #2d6a2d; font-weight: 600; }
+
+    /* Form sections */
+    .waiver-section {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem 2rem;
+      margin-bottom: 1.5rem;
+    }
+    .waiver-section h3 { font-size: 1rem; margin-bottom: 1.25rem; color: var(--charcoal); }
+
+    /* Signature canvas */
+    .sig-canvas-wrap {
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      position: relative;
+      margin-bottom: 0.75rem;
+      touch-action: none;
+    }
+    .sig-canvas-wrap canvas { display: block; border-radius: 8px; cursor: crosshair; }
+    .sig-placeholder {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%,-50%);
+      color: var(--light);
+      font-size: 0.85rem;
+      pointer-events: none;
+      text-align: center;
+    }
+    .sig-clear {
+      font-size: 0.78rem;
+      color: var(--mid);
+      cursor: pointer;
+      text-decoration: underline;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .sig-clear:hover { color: var(--red); }
+
+    /* Checkbox row */
+    .check-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 1rem;
+      background: var(--cream);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      cursor: pointer;
+    }
+    .check-row input[type=checkbox] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; accent-color: var(--red); cursor: pointer; }
+    .check-row label { font-size: 0.88rem; color: var(--charcoal); cursor: pointer; line-height: 1.55; }
+
+    .submit-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; }
+
+    @media (max-width: 680px) {
+      .waiver-doc { padding: 1.25rem 1rem; max-height: 360px; }
+      .waiver-section { padding: 1.25rem 1rem; }
+      .waiver-layout { padding: 24px 4% 60px; }
+      .submit-row { flex-direction: column; }
+      .submit-row .btn { width: 100%; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></a>
+  <button class="nav-toggle" id="navToggle" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="about.html">About Me</a></li>
+    <li><a href="schedule.html">Schedule</a></li>
+    <li><a href="register.html">Book</a></li>
+    <li><a href="waiver.html" class="active">Forms</a></li>
+    <li id="authNav"></li>
+  </ul>
+</nav>
+
+<div class="page-hero">
+  <p class="subtitle">Participant Forms</p>
+  <h1>Health &amp; Safety Waiver</h1>
+  <p>Please read the waiver carefully and complete all sections before attending your first class.</p>
+</div>
+
+<div class="waiver-layout">
+
+  <div id="alertBox" style="display:none" class="alert" role="alert"></div>
+
+  <!-- Already-signed banner (shown if user has signed) -->
+  <div id="signedBanner" class="signed-banner" style="display:none">
+    <span class="signed-banner-icon">✅</span>
+    <div>
+      <h3>You have already signed this waiver</h3>
+      <p id="signedDate">Signed on —</p>
+      <button class="btn btn-outline btn-sm" style="margin-top:0.75rem" onclick="downloadSignedCopy()">Download My Signed Copy</button>
+    </div>
+  </div>
+
+  <!-- Waiver document -->
+  <div class="waiver-doc" id="waiverDoc">
+
+    <p class="studio-name">Red Maple Movement Studio</p>
+    <h2>WAIVER, RELEASE OF LIABILITY &amp; ASSUMPTION OF RISK</h2>
+
+    <div class="caps">
+      IMPORTANT: This is a legal document that affects your rights. By signing, you are giving up your right to sue Red Maple Movement Studio and related parties for injuries or damages. Please read every section before signing.
+    </div>
+
+    <h3>1. Acknowledgment of Risks</h3>
+    <p>I acknowledge that I am voluntarily participating in Pilates and fitness activities, including studio classes, personal training, and use of Pilates equipment offered by <strong>Red Maple Movement Studio</strong> and its instructor(s) (collectively, "Red Maple Movement").</p>
+    <p>I understand that physical exercise carries inherent risks of injury or death, including but not limited to:</p>
+    <ul>
+      <li>Muscle strains, sprains, tears, and tendonitis</li>
+      <li>Bone fractures and joint injuries</li>
+      <li>Back, spine, and neck injuries</li>
+      <li>Cardiovascular stress, heart attack, or stroke</li>
+      <li>Dizziness, fainting, or loss of consciousness</li>
+      <li>Dehydration and heat exhaustion</li>
+      <li>Aggravation of pre-existing medical conditions</li>
+      <li>Falls or equipment-related injuries</li>
+      <li>Any other unforeseen injuries related to physical activity</li>
+    </ul>
+    <p>These risks exist even when activities are conducted properly and all reasonable precautions are taken.</p>
+
+    <h3>2. Health Declaration</h3>
+    <p>I confirm that I am in good physical health and capable of participating in Pilates and fitness activities. I have assessed my own physical condition and believe I am capable of safely participating in the activities offered at Red Maple Movement.</p>
+    <p>I certify that I do not have any medical conditions, injuries, or physical limitations that would prevent my safe participation, except as disclosed in my registration information. I accept full responsibility for assessing my own fitness and for informing my instructor of any relevant health changes.</p>
+    <p>I understand that Red Maple Movement does not provide medical advice. I am encouraged to consult my physician before beginning any new exercise programme, particularly if I have pre-existing health conditions, am over 40, have been sedentary, or have a family history of heart disease.</p>
+
+    <h3>3. Voluntary Assumption of Risk</h3>
+    <p>Having read and understood the risks described above, <strong>I voluntarily and knowingly assume all risks</strong> associated with my participation in Pilates and fitness activities at Red Maple Movement. I choose to participate voluntarily and accept responsibility for any injuries that may result, <strong>including those caused by the negligence of Red Maple Movement, its owners, instructors, employees, agents, or contractors.</strong></p>
+
+    <h3>4. Release of Liability</h3>
+    <p><strong>I hereby release, discharge, and hold harmless Red Maple Movement Studio, its owners, instructors, employees, agents, contractors, and volunteers (collectively, the "Released Parties") from any and all claims, demands, lawsuits, actions, damages, or liabilities of any kind</strong> arising out of or related to my participation in fitness and Pilates activities, including:</p>
+    <ul>
+      <li>Any injuries, death, or damages sustained while using the facility, equipment, or services</li>
+      <li><strong>Any injuries or damages caused, in whole or in part, by the negligence of the Released Parties</strong></li>
+      <li>Any claims for loss of earnings, medical expenses, or other costs associated with injury</li>
+      <li>All other claims of any nature, whether foreseen or unforeseen</li>
+    </ul>
+    <p>This release applies except in cases of <strong>gross negligence, reckless disregard for safety, or intentional harm</strong> by the Released Parties.</p>
+    <p><strong>By signing this waiver, I understand I am giving up my legal right to sue Red Maple Movement Studio and its instructors.</strong></p>
+
+    <h3>5. Indemnification</h3>
+    <p>I agree to indemnify, defend, and hold harmless the Released Parties from and against all claims, damages, liabilities, costs, and legal fees arising out of or related to my participation, any injury that occurs as a result of my participation, or any breach of this agreement by me.</p>
+
+    <h3>6. Emergency Medical Treatment</h3>
+    <p>I authorise Red Maple Movement staff to call emergency medical services (911) in the event of a serious injury or medical emergency. I consent to emergency medical treatment and transportation at my own expense. I release the Released Parties from liability for any decisions related to emergency care made on my behalf.</p>
+
+    <h3>7. Facility Rules &amp; Safety</h3>
+    <p>I agree to comply with all posted facility rules and safety guidelines, follow instructor instructions, report any equipment damage or safety concerns to staff, and not modify or service any equipment myself. I take full responsibility for following all safety instructions provided.</p>
+
+    <h3>8. Severability</h3>
+    <p>If any provision of this agreement is found unenforceable by a court, that provision shall be severed and all remaining provisions shall remain in full force and effect.</p>
+
+    <h3>9. Governing Law</h3>
+    <p>This agreement is governed by and construed in accordance with the laws of the Province of Ontario, Canada. I agree to submit to the jurisdiction of Ontario courts for any disputes arising from this agreement.</p>
+
+    <div class="caps">
+      I ACKNOWLEDGE THAT I HAVE READ AND FULLY UNDERSTAND THIS ENTIRE AGREEMENT. I UNDERSTAND THAT BY SIGNING BELOW I AM WAIVING MY RIGHT TO SUE RED MAPLE MOVEMENT STUDIO FOR INJURIES OR DAMAGES, INCLUDING THOSE CAUSED BY NEGLIGENCE (EXCEPT GROSS NEGLIGENCE OR INTENTIONAL HARM). I AM SIGNING THIS AGREEMENT VOLUNTARILY.
+    </div>
+
+    <p style="font-size:0.78rem;color:var(--mid);margin-top:1rem">
+      <em>Note: This waiver is provided for informational purposes and represents industry-standard fitness liability language for Ontario, Canada. Red Maple Movement recommends periodic legal review by a licensed Ontario solicitor. Electronic signatures are legally valid under Ontario's Electronic Commerce Act.</em>
+    </p>
+
+  </div><!-- /waiver-doc -->
+
+  <p class="scroll-prompt" id="scrollPrompt">↕ Scroll to read the full waiver before signing</p>
+
+  <!-- Participant Details -->
+  <div class="waiver-section" id="formSection">
+    <h3>Participant Information</h3>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="wFirstName">First Name *</label>
+        <input type="text" id="wFirstName" placeholder="Jane" required>
+      </div>
+      <div class="form-group">
+        <label for="wLastName">Last Name *</label>
+        <input type="text" id="wLastName" placeholder="Doe" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="wEmail">Email Address *</label>
+        <input type="email" id="wEmail" placeholder="jane@example.com" required>
+      </div>
+      <div class="form-group">
+        <label for="wPhone">Phone Number</label>
+        <input type="tel" id="wPhone" placeholder="+1 (555) 000-0000">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="wEmergencyName">Emergency Contact Name</label>
+        <input type="text" id="wEmergencyName" placeholder="Contact name">
+      </div>
+      <div class="form-group">
+        <label for="wEmergencyPhone">Emergency Contact Phone</label>
+        <input type="tel" id="wEmergencyPhone" placeholder="+1 (555) 000-0000">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="wHealth">Medical Conditions / Injuries to Disclose (if any)</label>
+      <input type="text" id="wHealth" placeholder="e.g. lower back injury, asthma — leave blank if none">
+    </div>
+  </div>
+
+  <!-- Signature -->
+  <div class="waiver-section">
+    <h3>Your Signature</h3>
+    <p style="font-size:0.85rem;color:var(--mid);margin-bottom:1rem">Draw your signature below using your mouse or finger, then type your full name to confirm.</p>
+
+    <div class="sig-canvas-wrap">
+      <canvas id="sigCanvas" width="700" height="160"></canvas>
+      <div class="sig-placeholder" id="sigPlaceholder">Draw your signature here</div>
+    </div>
+    <button class="sig-clear" onclick="clearSignature()">Clear signature</button>
+
+    <div class="form-group" style="margin-top:1.25rem">
+      <label for="wTypedName">Type Your Full Name (confirms electronic signature) *</label>
+      <input type="text" id="wTypedName" placeholder="Jane Doe" required>
+    </div>
+
+    <div class="form-group">
+      <label for="wDate">Date</label>
+      <input type="text" id="wDate" readonly style="background:var(--cream);color:var(--mid)">
+    </div>
+  </div>
+
+  <!-- Agreement checkboxes -->
+  <div class="waiver-section">
+    <h3>Declarations</h3>
+
+    <div class="check-row" onclick="toggle('chkRead')">
+      <input type="checkbox" id="chkRead">
+      <label for="chkRead">I confirm that I have scrolled through and read the entire waiver above.</label>
+    </div>
+
+    <div class="check-row" onclick="toggle('chkUnderstand')">
+      <input type="checkbox" id="chkUnderstand">
+      <label for="chkUnderstand">I understand that by signing I am giving up my right to sue Red Maple Movement Studio and its instructors for injuries or damages, including those caused by negligence.</label>
+    </div>
+
+    <div class="check-row" onclick="toggle('chkVoluntary')">
+      <input type="checkbox" id="chkVoluntary">
+      <label for="chkVoluntary">I am signing this agreement voluntarily, without coercion, and on behalf of myself (and my heirs and estate).</label>
+    </div>
+
+    <div class="check-row" onclick="toggle('chkHealth')">
+      <input type="checkbox" id="chkHealth">
+      <label for="chkHealth">I confirm that I am in good physical health, and have disclosed any medical conditions or injuries above.</label>
+    </div>
+  </div>
+
+  <!-- Submit row -->
+  <div class="submit-row">
+    <button class="btn btn-primary" id="submitBtn" onclick="submitWaiver()">Submit Signed Waiver</button>
+    <button class="btn btn-outline" onclick="downloadBlankPDF()">Download Blank Copy</button>
+  </div>
+
+</div><!-- /waiver-layout -->
+
+<footer>
+  <span class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></span>
+  <p>Move with Intention. Build Inner Strength.</p>
+  <p style="margin-bottom:0.5rem">Have Questions? Feel free to reach out – <a href="mailto:amanda@redmaplemovement.ca" style="color:var(--red-lt)">amanda@redmaplemovement.ca</a></p>
+  <div class="footer-links">
+    <a href="index.html">Home</a>
+    <a href="schedule.html">Schedule</a>
+    <a href="register.html">Book</a>
+    <a href="admin.html">Admin</a>
+  </div>
+  <div class="copyright">&copy; 2024 Red Maple Movement Studio. All rights reserved.</div>
+</footer>
+
+<!-- jsPDF from CDN for client-side PDF generation -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<script>
+// ── Date ────────────────────────────────────────────────────────
+const today = new Date();
+document.getElementById('wDate').value = today.toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric' });
+
+// ── Checkbox toggle ──────────────────────────────────────────────
+function toggle(id) { document.getElementById(id).checked = !document.getElementById(id).checked; }
+
+// ── Scroll detection ─────────────────────────────────────────────
+let hasScrolled = false;
+const waiverDoc   = document.getElementById('waiverDoc');
+const scrollPrompt = document.getElementById('scrollPrompt');
+
+waiverDoc.addEventListener('scroll', () => {
+  const nearBottom = waiverDoc.scrollTop + waiverDoc.clientHeight >= waiverDoc.scrollHeight - 40;
+  if (nearBottom && !hasScrolled) {
+    hasScrolled = true;
+    scrollPrompt.textContent = '✓ Waiver read';
+    scrollPrompt.classList.add('done');
+  }
+});
+
+// ── Signature Canvas ─────────────────────────────────────────────
+const canvas      = document.getElementById('sigCanvas');
+const ctx         = canvas.getContext('2d');
+const placeholder = document.getElementById('sigPlaceholder');
+let drawing = false;
+let hasSig  = false;
+
+// Responsive canvas width
+function resizeCanvas() {
+  const w = canvas.parentElement.clientWidth;
+  canvas.width  = w;
+  canvas.height = 160;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function getPos(e) {
+  const r = canvas.getBoundingClientRect();
+  if (e.touches) {
+    return { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top };
+  }
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+canvas.addEventListener('mousedown',  e => { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); });
+canvas.addEventListener('mousemove',  e => { if (!drawing) return; const p = getPos(e); ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#222'; ctx.lineTo(p.x, p.y); ctx.stroke(); hasSig = true; placeholder.style.display = 'none'; });
+canvas.addEventListener('mouseup',    () => { drawing = false; });
+canvas.addEventListener('mouseleave', () => { drawing = false; });
+
+canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); }, { passive: false });
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); if (!drawing) return; const p = getPos(e); ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#222'; ctx.lineTo(p.x, p.y); ctx.stroke(); hasSig = true; placeholder.style.display = 'none'; }, { passive: false });
+canvas.addEventListener('touchend',   () => { drawing = false; });
+
+function clearSignature() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  hasSig = false;
+  placeholder.style.display = '';
+}
+
+// ── Submit ────────────────────────────────────────────────────────
+async function submitWaiver() {
+  hideAlert();
+
+  const firstName     = document.getElementById('wFirstName').value.trim();
+  const lastName      = document.getElementById('wLastName').value.trim();
+  const email         = document.getElementById('wEmail').value.trim();
+  const phone         = document.getElementById('wPhone').value.trim();
+  const emergencyName = document.getElementById('wEmergencyName').value.trim();
+  const emergencyPhone= document.getElementById('wEmergencyPhone').value.trim();
+  const health        = document.getElementById('wHealth').value.trim();
+  const typedName     = document.getElementById('wTypedName').value.trim();
+
+  if (!firstName || !lastName || !email)   return showAlert('Please fill in your name and email.', 'error');
+  if (!typedName)                          return showAlert('Please type your full name to confirm your electronic signature.', 'error');
+  if (!document.getElementById('chkRead').checked)       return showAlert('Please confirm you have read the waiver.', 'error');
+  if (!document.getElementById('chkUnderstand').checked) return showAlert('Please confirm you understand the waiver.', 'error');
+  if (!document.getElementById('chkVoluntary').checked)  return showAlert('Please confirm you are signing voluntarily.', 'error');
+  if (!document.getElementById('chkHealth').checked)     return showAlert('Please confirm your health declaration.', 'error');
+
+  const signatureData = hasSig ? canvas.toDataURL('image/png') : null;
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  try {
+    const res  = await fetch('/api/waiver', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName, lastName, email, phone, emergencyName, emergencyPhone, health, typedName, signatureData })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      showSuccess({ firstName, lastName, email, phone, emergencyName, emergencyPhone, health, typedName, signatureData, signedAt: new Date().toISOString() });
+    } else {
+      showAlert(data.error || 'Submission failed. Please try again.', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Submit Signed Waiver';
+    }
+  } catch (_) {
+    showAlert('Network error. Please check your connection and try again.', 'error');
+    btn.disabled = false;
+    btn.textContent = 'Submit Signed Waiver';
+  }
+}
+
+function showSuccess(waiverData) {
+  const layout = document.querySelector('.waiver-layout');
+  layout.innerHTML = `
+    <div style="text-align:center;padding:3rem 1rem">
+      <div style="font-size:4rem;margin-bottom:1rem">✅</div>
+      <h2 style="font-family:'Playfair Display',serif;font-size:2rem;margin-bottom:0.75rem">Waiver Signed!</h2>
+      <p style="color:var(--mid);max-width:480px;margin:0 auto 2rem">
+        Thank you, <strong>${esc(waiverData.firstName)}</strong>. Your signed waiver has been saved.
+        You're all set to join class at Red Maple Movement.
+      </p>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick='generatePDF(${JSON.stringify(waiverData)})'>Download My Signed Copy</button>
+        <a href="register.html" class="btn btn-outline">Reserve Your Spot</a>
+      </div>
+    </div>
+  `;
+}
+
+// ── PDF generation (jsPDF, client-side) ──────────────────────────
+const WAIVER_TEXT = [
+  { type: 'h3', text: '1. Acknowledgment of Risks' },
+  { type: 'p',  text: 'I acknowledge that I am voluntarily participating in Pilates and fitness activities offered by Red Maple Movement Studio and its instructor(s). I understand that physical exercise carries inherent risks of injury or death, including: muscle strains, sprains and tears; bone fractures and joint injuries; back, spine, and neck injuries; cardiovascular stress, heart attack or stroke; dizziness, fainting or loss of consciousness; dehydration and heat exhaustion; aggravation of pre-existing conditions; falls or equipment-related injuries; and any other unforeseen injury related to physical activity.' },
+  { type: 'h3', text: '2. Health Declaration' },
+  { type: 'p',  text: 'I confirm that I am in good physical health and capable of participating in Pilates and fitness activities. I have assessed my own condition and accept full responsibility for informing my instructor of any relevant health changes. Red Maple Movement does not provide medical advice.' },
+  { type: 'h3', text: '3. Voluntary Assumption of Risk' },
+  { type: 'p',  text: 'I voluntarily and knowingly assume all risks associated with my participation, including those caused by the negligence of Red Maple Movement, its owners, instructors, employees, agents, or contractors.' },
+  { type: 'h3', text: '4. Release of Liability' },
+  { type: 'p',  text: 'I hereby release, discharge, and hold harmless Red Maple Movement Studio, its owners, instructors, employees, agents, contractors, and volunteers from any and all claims, demands, lawsuits, actions, damages, or liabilities of any kind arising out of or related to my participation, including any injuries or damages caused in whole or in part by the negligence of the Released Parties. This release applies except in cases of gross negligence, reckless disregard for safety, or intentional harm. BY SIGNING THIS WAIVER I AM GIVING UP MY LEGAL RIGHT TO SUE RED MAPLE MOVEMENT STUDIO AND ITS INSTRUCTORS.' },
+  { type: 'h3', text: '5. Indemnification' },
+  { type: 'p',  text: 'I agree to indemnify and hold harmless the Released Parties from all claims, damages, liabilities, costs, and legal fees arising from my participation or any breach of this agreement.' },
+  { type: 'h3', text: '6. Emergency Medical Treatment' },
+  { type: 'p',  text: 'I authorise Red Maple Movement staff to call emergency services in the event of a medical emergency. I consent to emergency medical treatment and transportation at my own expense.' },
+  { type: 'h3', text: '7. Governing Law' },
+  { type: 'p',  text: 'This agreement is governed by the laws of the Province of Ontario, Canada.' },
+];
+
+function generatePDF(data) {
+  const { jsPDF } = window.jspdf;
+  const doc   = new jsPDF('p', 'pt', 'a4');
+  const pw    = doc.internal.pageSize.getWidth();
+  const ph    = doc.internal.pageSize.getHeight();
+  const ml    = 50, mr = 50;
+  const tw    = pw - ml - mr;
+  let y       = 50;
+
+  function checkPage(need = 14) {
+    if (y + need > ph - 50) { doc.addPage(); y = 50; }
+  }
+
+  function addLine(text, size, style, colour, indent = 0) {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', style);
+    doc.setTextColor(...colour);
+    const lines = doc.splitTextToSize(text, tw - indent);
+    lines.forEach(ln => { checkPage(size * 1.4); doc.text(ln, ml + indent, y); y += size * 1.4; });
+  }
+
+  // Header
+  addLine('Red Maple Movement Studio', 16, 'bold',   [181, 52, 42]);
+  y += 4;
+  addLine('WAIVER, RELEASE OF LIABILITY & ASSUMPTION OF RISK', 11, 'bold', [58, 58, 58]);
+  y += 12;
+
+  // Date/participant info box
+  doc.setDrawColor(229, 224, 216);
+  doc.setFillColor(250, 247, 242);
+  doc.roundedRect(ml, y, tw, 80, 6, 6, 'FD');
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(107, 107, 107);
+  doc.text(`Name:`, ml + 12, y + 18);
+  doc.text(`Email:`, ml + 12, y + 32);
+  doc.text(`Phone:`, ml + 12, y + 46);
+  doc.text(`Emergency Contact:`, ml + 12, y + 60);
+  doc.text(`Health Notes:`, ml + 12, y + 74);
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(58, 58, 58);
+  doc.text(`${data.firstName} ${data.lastName}`, ml + 110, y + 18);
+  doc.text(data.email,                            ml + 110, y + 32);
+  doc.text(data.phone || '—',                     ml + 110, y + 46);
+  doc.text(data.emergencyName ? `${data.emergencyName} ${data.emergencyPhone || ''}` : '—', ml + 150, y + 60);
+  doc.text(data.health || 'None disclosed',        ml + 110, y + 74);
+  y += 96;
+
+  // Waiver body
+  WAIVER_TEXT.forEach(block => {
+    if (block.type === 'h3') {
+      y += 6;
+      addLine(block.text, 9, 'bold', [58, 58, 58]);
+      y += 2;
+    } else {
+      addLine(block.text, 8.5, 'normal', [80, 80, 80]);
+      y += 4;
+    }
+  });
+
+  y += 16;
+
+  // Signature section
+  checkPage(180);
+  doc.setDrawColor(229, 224, 216);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(ml, y, tw, 170, 6, 6, 'FD');
+
+  addLine('Electronic Signature', 10, 'bold', [58, 58, 58]);
+  y += 4;
+
+  if (data.signatureData) {
+    try {
+      doc.addImage(data.signatureData, 'PNG', ml + 10, y, tw - 20, 100);
+      y += 110;
+    } catch (_) { y += 10; }
+  } else {
+    doc.setDrawColor(200, 200, 200);
+    doc.line(ml + 10, y + 60, ml + tw - 10, y + 60);
+    y += 72;
+  }
+
+  addLine(`Typed name: ${data.typedName}`, 9, 'bold',   [58, 58, 58]);
+  const signedDate = new Date(data.signedAt).toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  addLine(`Signed electronically: ${signedDate}`, 8, 'normal', [107, 107, 107]);
+  y += 8;
+  addLine('This electronic signature is legally valid under Ontario\'s Electronic Commerce Act.', 7.5, 'italic', [150, 150, 150]);
+
+  doc.save('RedMapleMovement_Waiver_Signed.pdf');
+}
+
+function downloadBlankPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc  = new jsPDF('p', 'pt', 'a4');
+  const pw   = doc.internal.pageSize.getWidth();
+  const ph   = doc.internal.pageSize.getHeight();
+  const ml   = 50, mr = 50, tw = pw - ml - mr;
+  let y      = 50;
+
+  function checkPage(need = 14) { if (y + need > ph - 50) { doc.addPage(); y = 50; } }
+  function addLine(text, size, style, colour, indent = 0) {
+    doc.setFontSize(size); doc.setFont('helvetica', style); doc.setTextColor(...colour);
+    const lines = doc.splitTextToSize(text, tw - indent);
+    lines.forEach(ln => { checkPage(size * 1.4); doc.text(ln, ml + indent, y); y += size * 1.4; });
+  }
+
+  addLine('Red Maple Movement Studio', 16, 'bold', [181, 52, 42]);
+  y += 4;
+  addLine('WAIVER, RELEASE OF LIABILITY & ASSUMPTION OF RISK', 11, 'bold', [58, 58, 58]);
+  y += 12;
+
+  WAIVER_TEXT.forEach(block => {
+    if (block.type === 'h3') { y += 6; addLine(block.text, 9, 'bold', [58, 58, 58]); y += 2; }
+    else { addLine(block.text, 8.5, 'normal', [80, 80, 80]); y += 4; }
+  });
+
+  y += 20;
+  checkPage(160);
+  ['Participant Name (Print):', 'Email:', 'Phone:', 'Emergency Contact:', 'Health Conditions (if any):'].forEach(label => {
+    addLine(label, 9, 'bold', [58, 58, 58]);
+    doc.setDrawColor(180, 180, 180);
+    doc.line(ml, y + 2, ml + tw, y + 2);
+    y += 18;
+  });
+  y += 10;
+  addLine('Signature:', 9, 'bold', [58, 58, 58]);
+  doc.setDrawColor(180, 180, 180);
+  doc.line(ml, y + 40, ml + tw * 0.6, y + 40);
+  y += 50;
+  addLine('Date:', 9, 'bold', [58, 58, 58]);
+  doc.line(ml, y + 2, ml + tw * 0.3, y + 2);
+
+  doc.save('RedMapleMovement_Waiver.pdf');
+}
+
+// ── Check if already signed (if logged in) ───────────────────────
+(async function checkExisting() {
+  try {
+    const r = await fetch('/api/waiver/my');
+    if (!r.ok) return;
+    const { waiver } = await r.json();
+    if (!waiver) return;
+    const banner   = document.getElementById('signedBanner');
+    const dateEl   = document.getElementById('signedDate');
+    const signed   = new Date(waiver.signed_at).toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric' });
+    dateEl.textContent = `Signed on ${signed}`;
+    banner.style.display = 'flex';
+    // Store waiver data for re-download
+    window._existingWaiver = waiver;
+  } catch (_) {}
+})();
+
+function downloadSignedCopy() {
+  const w = window._existingWaiver;
+  if (!w) return;
+  generatePDF({
+    firstName:    w.first_name,
+    lastName:     w.last_name,
+    email:        w.email,
+    phone:        w.phone || '',
+    emergencyName: w.emergency_name || '',
+    emergencyPhone: w.emergency_phone || '',
+    health:       w.health_conditions || '',
+    typedName:    w.typed_name,
+    signatureData: w.signature_data || null,
+    signedAt:     w.signed_at
+  });
+}
+
+// ── Pre-fill if logged in ─────────────────────────────────────────
+(async function prefill() {
+  try {
+    const r = await fetch('/auth/me');
+    if (!r.ok) return;
+    const { user } = await r.json();
+    if (user.firstName) document.getElementById('wFirstName').value = user.firstName;
+    if (user.lastName)  document.getElementById('wLastName').value  = user.lastName;
+    if (user.email)     document.getElementById('wEmail').value     = user.email;
+  } catch (_) {}
+})();
+
+function showAlert(msg, type) {
+  const box = document.getElementById('alertBox');
+  box.className = `alert alert-${type === 'error' ? 'error' : 'success'}`;
+  box.textContent = msg;
+  box.style.display = 'block';
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function hideAlert() { document.getElementById('alertBox').style.display = 'none'; }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+document.getElementById('navToggle').addEventListener('click', function () {
+  this.classList.toggle('open');
+  document.getElementById('navLinks').classList.toggle('open');
+});
+</script>
+<script src="js/auth.js"></script>
+</body>
+</html>
