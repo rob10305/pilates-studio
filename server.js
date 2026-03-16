@@ -29,7 +29,7 @@ const pool = new Pool({
 app.set('trust proxy', 1);
 
 app.use(session({
-  store: new pgSession({ pool, tableName: 'user_sessions', createTableIfMissing: false }),
+  store: new pgSession({ pool, tableName: 'user_sessions', createTableIfMissing: true }),
   secret: process.env.SESSION_SECRET || 'redmaple-dev-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
@@ -265,6 +265,9 @@ app.post('/auth/logout', (req, res, next) => {
     res.json({ success: true });
   });
 });
+
+// Health check
+app.get('/health', (req, res) => res.send('OK'));
 
 // Debug endpoint — shows which env vars are present (never reveals values)
 app.get('/auth/debug', (req, res) => {
