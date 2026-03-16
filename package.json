@@ -8,6 +8,7 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.7.2",
     "express": "^4.18.2",
     "uuid": "^9.0.0"
   },
