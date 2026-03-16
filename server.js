@@ -266,21 +266,43 @@ app.post('/auth/logout', (req, res, next) => {
   });
 });
 
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-  app.get('/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login.html?error=google' }),
-    (req, res) => res.redirect('/')
-  );
-}
+// Debug endpoint — shows which env vars are present (never reveals values)
+app.get('/auth/debug', (req, res) => {
+  res.json({
+    APP_URL:                !!process.env.APP_URL,
+    SESSION_SECRET:         !!process.env.SESSION_SECRET,
+    GOOGLE_CLIENT_ID:       !!process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET:   !!process.env.GOOGLE_CLIENT_SECRET,
+    FACEBOOK_APP_ID:        !!process.env.FACEBOOK_APP_ID,
+    FACEBOOK_APP_SECRET:    !!process.env.FACEBOOK_APP_SECRET,
+    NODE_ENV:               process.env.NODE_ENV || '(not set)',
+    resolvedAppUrl:         process.env.APP_URL || `http://localhost:${PORT}`
+  });
+});
 
-if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
-  app.get('/auth/facebook', passport.authenticate('facebook', { scope: ['email'] }));
-  app.get('/auth/facebook/callback',
-    passport.authenticate('facebook', { failureRedirect: '/login.html?error=facebook' }),
-    (req, res) => res.redirect('/')
-  );
-}
+// Google OAuth — routes always registered; strategy check happens at request time
+app.get('/auth/google', (req, res, next) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET)
+    return res.redirect('/login.html?error=google-not-configured');
+  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+});
+app.get('/auth/google/callback', (req, res, next) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET)
+    return res.redirect('/login.html?error=google-not-configured');
+  passport.authenticate('google', { failureRedirect: '/login.html?error=google' })(req, res, next);
+}, (req, res) => res.redirect('/'));
+
+// Facebook OAuth — routes always registered; strategy check happens at request time
+app.get('/auth/facebook', (req, res, next) => {
+  if (!process.env.FACEBOOK_APP_ID || !process.env.FACEBOOK_APP_SECRET)
+    return res.redirect('/login.html?error=facebook-not-configured');
+  passport.authenticate('facebook', { scope: ['email'] })(req, res, next);
+});
+app.get('/auth/facebook/callback', (req, res, next) => {
+  if (!process.env.FACEBOOK_APP_ID || !process.env.FACEBOOK_APP_SECRET)
+    return res.redirect('/login.html?error=facebook-not-configured');
+  passport.authenticate('facebook', { failureRedirect: '/login.html?error=facebook' })(req, res, next);
+}, (req, res) => res.redirect('/'));
 
 // --- Classes API ---
 app.get('/api/classes', async (req, res) => {
