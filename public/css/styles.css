@@ -627,7 +627,7 @@ footer .nav-logo {
   font-size: 1.5rem;
 }
 
-footer .nav-logo-img { filter: brightness(0) invert(1); }
+footer .nav-logo-img { background: var(--white); border-radius: 8px; padding: 4px 6px; }
 footer p { font-size: 0.9rem; max-width: 400px; margin: 0 auto 2rem; }
 footer .footer-links { display: flex; justify-content: center; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap; }
 footer .footer-links a { color: rgba(255,255,255,0.6); font-size: 0.85rem; }
@@ -757,7 +757,7 @@ footer .copyright { font-size: 0.8rem; color: rgba(255,255,255,0.4); border-top:
   /* Footer */
   footer { padding: 40px 4% 24px; }
   footer .footer-links { gap: 1rem; }
-  footer .nav-logo-img { height: 38px; }
+  footer .nav-logo-img { height: 38px; padding: 3px 5px; }
 
   /* Buttons — ensure 44px touch target */
   .btn { padding: 0.85rem 1.75rem; min-height: 44px; }
