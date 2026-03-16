@@ -634,18 +634,133 @@ footer .footer-links a { color: rgba(255,255,255,0.6); font-size: 0.85rem; }
 footer .footer-links a:hover { color: var(--white); }
 footer .copyright { font-size: 0.8rem; color: rgba(255,255,255,0.4); border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem; }
 
+/* ===== Hamburger Toggle ===== */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  z-index: 101;
+  flex-shrink: 0;
+}
+.nav-toggle span {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background: var(--charcoal);
+  border-radius: 2px;
+  transition: transform 0.3s, opacity 0.3s;
+}
+.nav-toggle.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+.nav-toggle.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.nav-toggle.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
 /* ===== Responsive ===== */
+
+/* Tablet */
 @media (max-width: 900px) {
   .hero-visual { display: none; }
-  .schedule-layout { grid-template-columns: 1fr; }
+  .schedule-layout { grid-template-columns: 1fr; padding: 24px 4%; }
   .class-panel { position: static; }
   .admin-grid { grid-template-columns: 1fr; }
+  section { padding: 60px 4%; }
+  .about-strip { padding: 50px 4%; }
+  .page-hero { padding: 40px 4% 30px; }
 }
 
-@media (max-width: 600px) {
-  nav { padding: 0 4%; }
-  .nav-links { gap: 1rem; }
+/* Mobile */
+@media (max-width: 680px) {
+
+  /* Nav — hamburger */
+  nav { padding: 0 4%; position: relative; }
+  .nav-toggle { display: flex; }
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 70px;
+    left: 0; right: 0;
+    background: rgba(250,247,242,0.98);
+    backdrop-filter: blur(8px);
+    flex-direction: column;
+    padding: 0.5rem 0 1.5rem;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    gap: 0;
+    list-style: none;
+    z-index: 100;
+  }
+  .nav-links.open { display: flex; }
+  .nav-links li { width: 100%; }
+  .nav-links a {
+    display: block;
+    padding: 0.9rem 5%;
+    font-size: 1rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--charcoal);
+  }
+  .nav-links li:last-child a { border-bottom: none; }
+  .nav-logo-img { height: 42px; }
+
+  /* Hero */
+  .hero {
+    min-height: auto;
+    padding: 50px 4% 60px;
+    text-align: center;
+  }
+  .hero-content { max-width: 100%; }
+  .hero-content h1 { font-size: 2rem; }
+  .hero-content p { font-size: 1rem; max-width: 100%; }
+  .hero-actions { justify-content: center; }
+  .hero-actions .btn { flex: 1; text-align: center; min-width: 130px; }
+
+  /* Sections */
+  section { padding: 48px 4%; }
+  .section-header { margin-bottom: 32px; }
+  .section-header h2 { font-size: 1.8rem; }
+  .about-strip { padding: 48px 4%; }
+  .about-strip h2 { font-size: 1.6rem; }
+  .page-hero { padding: 32px 4% 24px; }
+  .page-hero h1 { font-size: 1.8rem; }
+
+  /* Service cards */
+  .services-grid { gap: 1rem; }
+  .service-card { padding: 1.75rem 1.25rem; }
+
+  /* Stats */
+  .stats { gap: 1.5rem; }
+  .stat-number { font-size: 2rem; }
+
+  /* Calendar */
+  .cal-day { min-height: 52px; padding: 4px; }
+  .cal-day-name { font-size: 0.65rem; padding: 0.5rem 0; }
+  .day-num { font-size: 0.78rem; width: 24px; height: 24px; }
+  .day-dot { width: 6px; height: 6px; }
+  .cal-nav { width: 38px; height: 38px; font-size: 1.1rem; }
+
+  /* Form — prevent iOS zoom (must be ≥16px) */
+  .form-group input,
+  .form-group select { font-size: 1rem; padding: 0.85rem 1rem; }
   .form-row { grid-template-columns: 1fr; }
-  .form-card { padding: 1.75rem 1.25rem; }
-  .stats { gap: 2rem; }
+  .form-card { padding: 1.5rem 1.1rem; }
+  .register-layout { padding: 24px 4%; }
+
+  /* Admin */
+  .admin-layout { padding: 24px 4%; }
+  .admin-login { margin: 60px auto; }
+  .admin-card-body { padding: 1rem; }
+  .admin-class-item { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+
+  /* Footer */
+  footer { padding: 40px 4% 24px; }
+  footer .footer-links { gap: 1rem; }
+  footer .nav-logo-img { height: 38px; }
+
+  /* Buttons — ensure 44px touch target */
+  .btn { padding: 0.85rem 1.75rem; min-height: 44px; }
+  .btn-sm { padding: 0.6rem 1.1rem; min-height: 44px; }
+  .cal-nav { min-width: 44px; min-height: 44px; }
 }

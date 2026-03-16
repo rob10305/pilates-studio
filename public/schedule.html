@@ -12,7 +12,8 @@
 
 <nav>
   <a href="index.html" class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></a>
-  <ul class="nav-links">
+  <button class="nav-toggle" id="navToggle" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <ul class="nav-links" id="navLinks">
     <li><a href="index.html">Home</a></li>
     <li><a href="schedule.html" class="active">Schedule</a></li>
     <li><a href="register.html">Book a Class</a></li>
@@ -261,6 +262,11 @@ function resetPanel() {
 }
 
 loadClasses();
+
+document.getElementById('navToggle').addEventListener('click', function() {
+  this.classList.toggle('open');
+  document.getElementById('navLinks').classList.toggle('open');
+});
 </script>
 </body>
 </html>

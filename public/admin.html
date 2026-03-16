@@ -12,7 +12,8 @@
 
 <nav>
   <a href="index.html" class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></a>
-  <ul class="nav-links">
+  <button class="nav-toggle" id="navToggle" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <ul class="nav-links" id="navLinks">
     <li><a href="index.html">Home</a></li>
     <li><a href="schedule.html">Schedule</a></li>
     <li><a href="register.html">Book a Class</a></li>
@@ -306,6 +307,11 @@ async function addClass(e) {
     btn.disabled = false;
   }
 }
+
+document.getElementById('navToggle').addEventListener('click', function() {
+  this.classList.toggle('open');
+  document.getElementById('navLinks').classList.toggle('open');
+});
 
 async function deleteClass(classId) {
   if (!confirm('Are you sure you want to delete this class? All registrations for it will also be removed.')) return;
