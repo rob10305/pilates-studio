@@ -79,6 +79,20 @@ async function initDB() {
     CREATE INDEX IF NOT EXISTS IDX_user_sessions_expire ON user_sessions (expire);
   `);
 
+  // Fix deferrable PK on user_sessions — connect-pg-simple requires a non-deferrable PK
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'user_sessions_pkey' AND condeferrable = true
+      ) THEN
+        ALTER TABLE user_sessions DROP CONSTRAINT user_sessions_pkey;
+        ALTER TABLE user_sessions ADD CONSTRAINT user_sessions_pkey PRIMARY KEY (sid);
+      END IF;
+    END $$;
+  `);
+
   // Waivers table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS waivers (
