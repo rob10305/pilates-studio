@@ -6,13 +6,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'pilates2024';
 
+if (!process.env.DATABASE_URL) {
+  console.error('ERROR: DATABASE_URL environment variable is not set.');
+  console.error('Add a PostgreSQL database to your Railway project, or set DATABASE_URL locally.');
+  process.exit(1);
+}
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Database ---
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  ssl: { rejectUnauthorized: false }
 });
 
 async function initDB() {
@@ -174,8 +180,16 @@ app.get('/api/registrations', async (req, res) => {
 // Start
 initDB()
   .then(() => {
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Red Maple Movement running on port ${PORT}`);
+    });
+
+    // Graceful shutdown — lets Railway restart containers cleanly
+    process.on('SIGTERM', () => {
+      server.close(() => {
+        pool.end();
+        console.log('Server closed.');
+      });
     });
   })
   .catch(err => {
