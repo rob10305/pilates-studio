@@ -712,7 +712,7 @@ footer .copyright { font-size: 0.8rem; color: rgba(255,255,255,0.4); border-top:
     text-align: center;
   }
   .hero-content { max-width: 100%; }
-  .hero-content h1 { font-size: 2rem; }
+  .hero-content h1 { font-size: clamp(1.6rem, 5vw, 2rem); }
   .hero-content p { font-size: 1rem; max-width: 100%; }
   .hero-actions { justify-content: center; }
   .hero-actions .btn { flex: 1; text-align: center; min-width: 130px; }
