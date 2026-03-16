@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Me — Red Maple Movement</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .about-hero {
+      background: linear-gradient(135deg, #FAF7F2 0%, #F2EAE4 100%);
+      padding: 60px 5% 50px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .about-hero h1 { font-size: 2.8rem; margin-bottom: 0.4rem; }
+    .about-hero .subtitle { margin-bottom: 1rem; }
+
+    /* Image gallery */
+    .about-images {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      max-width: 860px;
+      margin: 0 auto 3rem;
+      padding: 0 5%;
+    }
+
+    .about-img-slot {
+      aspect-ratio: 4 / 5;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--grey-lt);
+      border: 2px dashed var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 0.5rem;
+      color: var(--light);
+      font-size: 0.85rem;
+    }
+
+    .about-img-slot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .about-img-slot .placeholder-icon { font-size: 2.5rem; }
+
+    /* Bio section */
+    .about-bio {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 0 5% 80px;
+    }
+
+    .about-bio .section-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--red);
+      margin-bottom: 0.75rem;
+    }
+
+    .about-bio h2 {
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.2;
+    }
+
+    .about-bio p {
+      color: var(--mid);
+      font-size: 1.05rem;
+      line-height: 1.8;
+      margin-bottom: 1.25rem;
+    }
+
+    .about-bio .cta-row {
+      margin-top: 2.5rem;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 680px) {
+      .about-images { grid-template-columns: 1fr; }
+      .about-hero h1 { font-size: 2rem; }
+      .about-bio h2 { font-size: 1.6rem; }
+      .about-images { padding: 0 4%; }
+      .about-bio { padding: 0 4% 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></a>
+  <button class="nav-toggle" id="navToggle" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="about.html" class="active">About Me</a></li>
+    <li><a href="schedule.html">Schedule</a></li>
+    <li><a href="register.html">Book</a></li>
+    <li><a href="register.html">Forms</a></li>
+    <li id="authNav"></li>
+  </ul>
+</nav>
+
+<div class="about-hero">
+  <p class="subtitle">Meet Your Instructor</p>
+  <h1>About Me</h1>
+</div>
+
+<!-- Images -->
+<div class="about-images" style="margin-top: 3rem;">
+
+  <!-- Replace src with your own image path when ready, e.g. src="images/amanda-1.jpg" -->
+  <div class="about-img-slot">
+    <span class="placeholder-icon">📷</span>
+    <span>Photo coming soon</span>
+  </div>
+
+  <!-- Replace src with your own image path when ready, e.g. src="images/amanda-2.jpg" -->
+  <div class="about-img-slot">
+    <span class="placeholder-icon">📷</span>
+    <span>Photo coming soon</span>
+  </div>
+
+</div>
+
+<!-- Bio -->
+<div class="about-bio">
+  <p class="section-label">My Story</p>
+  <h2>Hi, I'm Amanda.</h2>
+
+  <p>
+    I'm a certified Pilates instructor and the founder of Red Maple Movement — a small-group studio built on the belief that movement should feel intentional, empowering, and accessible to every body.
+  </p>
+
+  <p>
+    My journey with Pilates began as a personal one. I discovered how transformative focused, mindful movement could be — not just for the body, but for how you feel in it. That experience is what drives everything I do in the studio today.
+  </p>
+
+  <p>
+    Every class I teach is designed with care: small groups, a supportive atmosphere, and a focus on helping you build real strength from the inside out. Whether you're completely new to Pilates or returning after time away, you're welcome here.
+  </p>
+
+  <div class="cta-row">
+    <a href="schedule.html" class="btn btn-primary">View Schedule</a>
+    <a href="register.html" class="btn btn-outline">Reserve Your Spot</a>
+  </div>
+</div>
+
+<footer>
+  <span class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></span>
+  <p>Move with Intention. Build Inner Strength.</p>
+  <p style="margin-bottom:0.5rem">Have Questions? Feel free to reach out – <a href="mailto:amanda@redmaplemovement.ca" style="color:var(--red-lt)">amanda@redmaplemovement.ca</a></p>
+  <div class="footer-links">
+    <a href="index.html">Home</a>
+    <a href="schedule.html">Schedule</a>
+    <a href="register.html">Book</a>
+    <a href="admin.html">Admin</a>
+  </div>
+  <div class="copyright">&copy; 2024 Red Maple Movement Studio. All rights reserved.</div>
+</footer>
+
+<script>
+document.getElementById('navToggle').addEventListener('click', function () {
+  this.classList.toggle('open');
+  document.getElementById('navLinks').classList.toggle('open');
+});
+</script>
+<script src="js/auth.js"></script>
+</body>
+</html>
