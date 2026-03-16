@@ -1,0 +1,26 @@
+[build]
+  publish = "public"
+
+[[redirects]]
+  from = "/api/classes/:id"
+  to = "/.netlify/functions/classes?id=:id"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/classes"
+  to = "/.netlify/functions/classes"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/register"
+  to = "/.netlify/functions/register"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/registrations"
+  to = "/.netlify/functions/registrations"
+  status = 200
+  force = true
