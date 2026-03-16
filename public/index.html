@@ -7,6 +7,56 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* ── Keyframes ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(32px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes blobEnter {
+      from { opacity: 0; scale: 0.55; }
+      to   { opacity: 1; scale: 1; }
+    }
+    @keyframes drawLine {
+      from { width: 0; }
+      to   { width: 60px; }
+    }
+
+    /* ── Nav entrance ── */
+    nav { animation: slideDown 0.55s ease-out both; }
+
+    /* ── Hero content stagger ── */
+    .hero-content > *:nth-child(1) { animation: fadeUp 0.7s ease-out 0.20s both; }
+    .hero-content > *:nth-child(2) { animation: fadeUp 0.7s ease-out 0.40s both; }
+    .hero-content > *:nth-child(3) { animation: fadeUp 0.7s ease-out 0.60s both; }
+    .hero-content > *:nth-child(4) { animation: fadeUp 0.7s ease-out 0.80s both; }
+
+    /* ── Hero blob entrance (then hands back to morph) ── */
+    .hero-visual {
+      animation: blobEnter 1s cubic-bezier(0.34,1.4,0.64,1) 0.35s both,
+                 morph 8s ease-in-out 1.35s infinite;
+    }
+
+    /* ── Scroll-reveal base state ── */
+    .reveal        { opacity: 0; transform: translateY(28px); transition: opacity 0.65s ease, transform 0.65s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* ── Subtitle accent line ── */
+    .section-header .subtitle::after {
+      content: '';
+      display: block;
+      height: 2px;
+      background: var(--red);
+      border-radius: 2px;
+      margin: 8px auto 0;
+      animation: drawLine 0.6s ease-out 1.4s both;
+      width: 0;
+    }
+  </style>
 </head>
 <body>
 
@@ -36,7 +86,7 @@
 
 <!-- Services -->
 <section class="services">
-  <div class="section-header">
+  <div class="section-header reveal">
     <p class="subtitle">What We Offer</p>
     <h2>Classes for Every Body</h2>
     <p>From absolute beginners to advanced practitioners, we have the perfect class waiting for you.</p>
@@ -44,7 +94,7 @@
 
   <div class="services-grid">
 
-    <div class="service-card">
+    <div class="service-card reveal">
       <span class="service-icon">🌱</span>
       <h3>Foundations Pilates</h3>
       <p>The perfect starting point. Build core strength, improve posture, and learn the fundamental principles of Pilates in a gentle, encouraging environment.</p>
@@ -54,7 +104,7 @@
       </div>
     </div>
 
-    <div class="service-card">
+    <div class="service-card reveal">
       <span class="service-icon">✨</span>
       <h3>Mat Pilates</h3>
       <p>Classic mat-based Pilates focusing on controlled movement, breathwork, and full-body conditioning. Strengthen from the inside out — no equipment needed.</p>
@@ -64,7 +114,7 @@
       </div>
     </div>
 
-    <div class="service-card">
+    <div class="service-card reveal">
       <span class="service-icon">🔥</span>
       <h3>Reformer Pilates</h3>
       <p>Using the iconic Pilates reformer machine, this dynamic class builds long, lean muscles with spring-loaded resistance that challenges and supports simultaneously.</p>
@@ -74,7 +124,7 @@
       </div>
     </div>
 
-    <div class="service-card">
+    <div class="service-card reveal">
       <span class="service-icon">🧘</span>
       <h3>Pilates &amp; Flow</h3>
       <p>A mindful blend of Pilates and gentle yoga flow. Improve flexibility, reduce stress, and restore balance to both body and mind with this calming fusion class.</p>
@@ -84,7 +134,7 @@
       </div>
     </div>
 
-    <div class="service-card">
+    <div class="service-card reveal">
       <span class="service-icon">💪</span>
       <h3>Power Pilates</h3>
       <p>A high-energy, full-body workout that amps up the traditional Pilates method. Expect sweat, strength, and a serious endorphin boost — for those ready to level up.</p>
@@ -94,7 +144,7 @@
       </div>
     </div>
 
-    <div class="service-card">
+    <div class="service-card reveal">
       <span class="service-icon">🌸</span>
       <h3>Prenatal Pilates</h3>
       <p>Specially designed for expectant mothers, this gentle class supports a healthy pregnancy with safe, effective exercises that strengthen, relax, and prepare your body.</p>
@@ -109,25 +159,25 @@
 
 <!-- About Strip -->
 <div class="about-strip">
-  <h2>A Studio Built on Warmth &amp; Wellbeing</h2>
-  <p>At Red Maple Movement, every class is a chance to reconnect with yourself. Our certified instructors create a safe and joyful space where progress is celebrated, not compared.</p>
-  <a href="schedule.html" class="btn btn-primary">Browse Our Classes</a>
+  <h2 class="reveal">A Studio Built on Warmth &amp; Wellbeing</h2>
+  <p class="reveal">At Red Maple Movement, every class is a chance to reconnect with yourself. Our certified instructors create a safe and joyful space where progress is celebrated, not compared.</p>
+  <a href="schedule.html" class="btn btn-primary reveal">Browse Our Classes</a>
 
   <div class="stats">
-    <div class="stat">
-      <div class="stat-number">6+</div>
+    <div class="stat reveal">
+      <div class="stat-number" data-target="6" data-suffix="+">6+</div>
       <div class="stat-label">Class Types</div>
     </div>
-    <div class="stat">
-      <div class="stat-number">200+</div>
+    <div class="stat reveal">
+      <div class="stat-number" data-target="200" data-suffix="+">200+</div>
       <div class="stat-label">Happy Members</div>
     </div>
-    <div class="stat">
-      <div class="stat-number">8</div>
+    <div class="stat reveal">
+      <div class="stat-number" data-target="8" data-suffix="">8</div>
       <div class="stat-label">Expert Instructors</div>
     </div>
-    <div class="stat">
-      <div class="stat-number">5★</div>
+    <div class="stat reveal">
+      <div class="stat-number" data-target="5" data-suffix="★">5★</div>
       <div class="stat-label">Community Rating</div>
     </div>
   </div>
@@ -147,5 +197,46 @@
   <div class="copyright">&copy; 2024 Red Maple Movement Studio. All rights reserved.</div>
 </footer>
 
+<script>
+  // ── Staggered scroll-reveal ──────────────────────────────────
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+
+      const el = entry.target;
+      // Stagger cards by their index within the grid
+      const siblings = el.parentElement.querySelectorAll('.reveal');
+      const idx = [...siblings].indexOf(el);
+      el.style.transitionDelay = `${idx * 90}ms`;
+      el.classList.add('visible');
+
+      // Trigger stat counter when stat becomes visible
+      const counter = el.querySelector('[data-target]');
+      if (counter) animateCounter(counter);
+
+      observer.unobserve(el);
+    });
+  }, { threshold: 0.15 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // ── Animated number counter ──────────────────────────────────
+  function animateCounter(el) {
+    const target = parseInt(el.dataset.target, 10);
+    const suffix = el.dataset.suffix || '';
+    const duration = 1400;
+    const start = performance.now();
+
+    function tick(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = Math.round(eased * target) + suffix;
+      if (progress < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+</script>
 </body>
 </html>
