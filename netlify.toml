@@ -1,0 +1,25 @@
+[build]
+  publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/api/classes"
+  to = "/.netlify/functions/classes"
+  status = 200
+
+[[redirects]]
+  from = "/api/classes/*"
+  to = "/.netlify/functions/classes/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/register"
+  to = "/.netlify/functions/register"
+  status = 200
+
+[[redirects]]
+  from = "/api/registrations"
+  to = "/.netlify/functions/registrations"
+  status = 200
