@@ -18,6 +18,7 @@
     <li><a href="schedule.html">Schedule</a></li>
     <li><a href="register.html" class="active">Book a Class</a></li>
     <li><a href="admin.html">Admin</a></li>
+    <li id="authNav"></li>
   </ul>
 </nav>
 
@@ -217,10 +218,23 @@ function showSuccess(firstName, classId) {
 
 loadClasses();
 
+// Pre-fill form if user is signed in
+(async function () {
+  try {
+    const r = await fetch('/auth/me');
+    if (!r.ok) return;
+    const { user } = await r.json();
+    if (user.firstName) document.getElementById('firstName').value = user.firstName;
+    if (user.lastName)  document.getElementById('lastName').value  = user.lastName;
+    if (user.email)     document.getElementById('email').value     = user.email;
+  } catch (_) {}
+})();
+
 document.getElementById('navToggle').addEventListener('click', function() {
   this.classList.toggle('open');
   document.getElementById('navLinks').classList.toggle('open');
 });
 </script>
+<script src="js/auth.js"></script>
 </body>
 </html>
