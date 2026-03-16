@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schedule — Serenity Pilates</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Serenity <span>Pilates</span></div>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="schedule.html" class="active">Schedule</a></li>
+    <li><a href="register.html">Book a Class</a></li>
+    <li><a href="admin.html">Admin</a></li>
+  </ul>
+</nav>
+
+<div class="page-hero">
+  <p class="subtitle">Classes &amp; Availability</p>
+  <h1>Class Schedule</h1>
+  <p>Click any highlighted date to see available classes and spots remaining.</p>
+</div>
+
+<div class="schedule-layout">
+
+  <!-- Calendar -->
+  <div>
+    <div class="calendar-wrap">
+      <div class="calendar-header">
+        <button class="cal-nav" id="prevMonth">&#8249;</button>
+        <h3 id="calMonthLabel">Month Year</h3>
+        <button class="cal-nav" id="nextMonth">&#8250;</button>
+      </div>
+      <div class="calendar-grid" id="calGrid"></div>
+    </div>
+
+    <div style="margin-top:1rem; display:flex; gap:1.5rem; padding:0 0.25rem; font-size:0.82rem; color:var(--mid);">
+      <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--sage);display:inline-block"></span> Classes available</span>
+      <span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--light);display:inline-block"></span> Class full</span>
+    </div>
+  </div>
+
+  <!-- Class Panel -->
+  <div class="class-panel">
+    <div class="class-panel-header">
+      <h3 id="panelTitle">Select a Date</h3>
+      <p id="panelSubtitle">Click a highlighted date to view classes</p>
+    </div>
+    <div class="class-list" id="classList">
+      <div class="empty-state">
+        <div style="font-size:2.5rem">📅</div>
+        <p>Select a date on the calendar to view available classes.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span class="nav-logo">Serenity <span style="color:var(--gold)">Pilates</span></span>
+  <p>Move well, feel well, live well.</p>
+  <div class="footer-links">
+    <a href="index.html">Home</a>
+    <a href="schedule.html">Schedule</a>
+    <a href="register.html">Book a Class</a>
+  </div>
+  <div class="copyright">&copy; 2024 Serenity Pilates Studio.</div>
+</footer>
+
+<script>
+let allClasses = [];
+let currentDate = new Date();
+let selectedDate = null;
+
+async function loadClasses() {
+  try {
+    const res = await fetch('/api/classes');
+    allClasses = await res.json();
+    renderCalendar();
+  } catch (e) {
+    console.error('Failed to load classes', e);
+  }
+}
+
+function formatDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getClassesForDate(dateKey) {
+  return allClasses.filter(c => c.date === dateKey);
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calGrid');
+  const label = document.getElementById('calMonthLabel');
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  const monthNames = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
+  label.textContent = `${monthNames[month]} ${year}`;
+
+  grid.innerHTML = '';
+
+  // Day headers
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-day-name';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  const today = formatDateKey(new Date());
+
+  // Prev month padding
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const el = document.createElement('div');
+    el.className = 'cal-day other-month';
+    const num = document.createElement('div');
+    num.className = 'day-num';
+    num.style.color = '#ccc';
+    num.textContent = daysInPrevMonth - i;
+    el.appendChild(num);
+    grid.appendChild(el);
+  }
+
+  // Current month days
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateKey = `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayClasses = getClassesForDate(dateKey);
+    const hasClass = dayClasses.length > 0;
+    const allFull = hasClass && dayClasses.every(c => c.registeredCount >= c.capacity);
+
+    const el = document.createElement('div');
+    el.className = 'cal-day' +
+      (dateKey === today ? ' today' : '') +
+      (hasClass ? ' has-class' : '') +
+      (selectedDate === dateKey ? ' selected' : '');
+
+    const num = document.createElement('div');
+    num.className = 'day-num';
+    num.textContent = d;
+    el.appendChild(num);
+
+    if (hasClass) {
+      const dots = document.createElement('div');
+      dots.className = 'day-dots';
+      dayClasses.forEach(c => {
+        const dot = document.createElement('div');
+        dot.className = 'day-dot' + (c.registeredCount >= c.capacity ? ' full' : '');
+        dots.appendChild(dot);
+      });
+      el.appendChild(dots);
+
+      el.addEventListener('click', () => {
+        selectedDate = dateKey;
+        renderCalendar();
+        showClassesForDate(dateKey);
+      });
+    }
+
+    grid.appendChild(el);
+  }
+
+  // Next month padding
+  const totalCells = firstDay + daysInMonth;
+  const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let i = 1; i <= remaining; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day other-month';
+    const num = document.createElement('div');
+    num.className = 'day-num';
+    num.style.color = '#ccc';
+    num.textContent = i;
+    el.appendChild(num);
+    grid.appendChild(el);
+  }
+}
+
+function showClassesForDate(dateKey) {
+  const classes = getClassesForDate(dateKey);
+  const panel = document.getElementById('classList');
+  const title = document.getElementById('panelTitle');
+  const subtitle = document.getElementById('panelSubtitle');
+
+  const [y, m, d] = dateKey.split('-');
+  const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  title.textContent = `${dayNames[dateObj.getDay()]}, ${monthNames[parseInt(m)-1]} ${parseInt(d)}`;
+  subtitle.textContent = `${classes.length} class${classes.length !== 1 ? 'es' : ''} available`;
+
+  if (classes.length === 0) {
+    panel.innerHTML = `<div class="empty-state"><div style="font-size:2rem">🗓️</div><p>No classes on this date.</p></div>`;
+    return;
+  }
+
+  panel.innerHTML = classes.map(cls => {
+    const spotsLeft = cls.capacity - cls.registeredCount;
+    const isFull = spotsLeft <= 0;
+    const isFew = !isFull && spotsLeft <= 3;
+
+    let badge, badgeClass;
+    if (isFull) { badge = 'Full'; badgeClass = 'full-badge'; }
+    else if (isFew) { badge = `${spotsLeft} left`; badgeClass = 'few'; }
+    else { badge = `${spotsLeft} open`; badgeClass = 'open'; }
+
+    return `
+      <div class="class-item${isFull ? ' full' : ''}" onclick="${isFull ? '' : `bookClass('${cls.id}')`}" style="${isFull ? '' : 'cursor:pointer'}">
+        <div class="class-item-top">
+          <div class="class-item-title">${cls.title}</div>
+          <span class="availability ${badgeClass}">${badge}</span>
+        </div>
+        <div class="class-item-meta">
+          <span>🕐 ${cls.time}</span>
+          <span>⏱ ${cls.duration} min</span>
+          <span>👤 ${cls.instructor}</span>
+        </div>
+        ${cls.description ? `<p style="font-size:0.8rem;color:var(--mid);margin-top:0.5rem">${cls.description}</p>` : ''}
+        ${!isFull ? `<div style="margin-top:0.75rem"><button class="btn btn-sage btn-sm" onclick="event.stopPropagation();bookClass('${cls.id}')">Book Now</button></div>` : '<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--light)">Class is fully booked</div>'}
+      </div>`;
+  }).join('');
+}
+
+function bookClass(classId) {
+  window.location.href = `register.html?classId=${classId}`;
+}
+
+document.getElementById('prevMonth').addEventListener('click', () => {
+  currentDate.setMonth(currentDate.getMonth() - 1);
+  selectedDate = null;
+  renderCalendar();
+  resetPanel();
+});
+
+document.getElementById('nextMonth').addEventListener('click', () => {
+  currentDate.setMonth(currentDate.getMonth() + 1);
+  selectedDate = null;
+  renderCalendar();
+  resetPanel();
+});
+
+function resetPanel() {
+  document.getElementById('panelTitle').textContent = 'Select a Date';
+  document.getElementById('panelSubtitle').textContent = 'Click a highlighted date to view classes';
+  document.getElementById('classList').innerHTML = `<div class="empty-state"><div style="font-size:2.5rem">📅</div><p>Select a date on the calendar to view available classes.</p></div>`;
+}
+
+loadClasses();
+</script>
+</body>
+</html>

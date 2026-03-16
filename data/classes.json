@@ -1,0 +1,102 @@
+[
+  {
+    "id": "1001",
+    "title": "Foundations Pilates",
+    "instructor": "Sophie Andrews",
+    "date": "2026-03-17",
+    "time": "09:00",
+    "duration": 45,
+    "capacity": 10,
+    "description": "Perfect for beginners — build core strength and learn the fundamentals."
+  },
+  {
+    "id": "1002",
+    "title": "Mat Pilates",
+    "instructor": "Claire Holt",
+    "date": "2026-03-17",
+    "time": "11:00",
+    "duration": 60,
+    "capacity": 12,
+    "description": "Classic mat-based Pilates for full-body conditioning."
+  },
+  {
+    "id": "1003",
+    "title": "Power Pilates",
+    "instructor": "James Reid",
+    "date": "2026-03-18",
+    "time": "07:30",
+    "duration": 50,
+    "capacity": 8,
+    "description": "High-energy workout for those ready to level up their practice."
+  },
+  {
+    "id": "1004",
+    "title": "Pilates & Flow",
+    "instructor": "Sophie Andrews",
+    "date": "2026-03-19",
+    "time": "10:00",
+    "duration": 60,
+    "capacity": 10,
+    "description": "A mindful blend of Pilates and gentle yoga flow."
+  },
+  {
+    "id": "1005",
+    "title": "Reformer Pilates",
+    "instructor": "Claire Holt",
+    "date": "2026-03-20",
+    "time": "09:30",
+    "duration": 55,
+    "capacity": 6,
+    "description": "Spring-loaded resistance training on the iconic reformer machine."
+  },
+  {
+    "id": "1006",
+    "title": "Foundations Pilates",
+    "instructor": "Sophie Andrews",
+    "date": "2026-03-21",
+    "time": "09:00",
+    "duration": 45,
+    "capacity": 10,
+    "description": "Perfect for beginners — build core strength and learn the fundamentals."
+  },
+  {
+    "id": "1007",
+    "title": "Prenatal Pilates",
+    "instructor": "Emma Walsh",
+    "date": "2026-03-22",
+    "time": "10:30",
+    "duration": 45,
+    "capacity": 8,
+    "description": "Gentle and safe Pilates designed for expectant mothers."
+  },
+  {
+    "id": "1008",
+    "title": "Mat Pilates",
+    "instructor": "James Reid",
+    "date": "2026-03-24",
+    "time": "18:00",
+    "duration": 60,
+    "capacity": 12,
+    "description": "Unwind after your workday with a refreshing evening mat class."
+  },
+  {
+    "id": "1009",
+    "title": "Power Pilates",
+    "instructor": "Claire Holt",
+    "date": "2026-03-26",
+    "time": "07:00",
+    "duration": 50,
+    "capacity": 8,
+    "description": "Start your Wednesday strong with our most energising class."
+  },
+  {
+    "id": "1010",
+    "title": "Pilates & Flow",
+    "instructor": "Emma Walsh",
+    "date": "2026-03-28",
+    "time": "11:00",
+    "duration": 60,
+    "capacity": 10,
+    "description": "End your week with balance and calm."
+  }
+]

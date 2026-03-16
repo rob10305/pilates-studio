@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book a Class — Serenity Pilates</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Serenity <span>Pilates</span></div>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="schedule.html">Schedule</a></li>
+    <li><a href="register.html" class="active">Book a Class</a></li>
+    <li><a href="admin.html">Admin</a></li>
+  </ul>
+</nav>
+
+<div class="page-hero">
+  <p class="subtitle">Reserve Your Spot</p>
+  <h1>Book a Class</h1>
+  <p>Fill in your details below to secure your place. We can't wait to see you on the mat!</p>
+</div>
+
+<div class="register-layout">
+  <div class="form-card" id="formCard">
+
+    <div id="alertBox" style="display:none"></div>
+
+    <h2>Registration</h2>
+    <p class="subtitle">Your Details</p>
+
+    <!-- Selected class banner -->
+    <div class="selected-class-banner" id="classBanner" style="display:none">
+      <div class="scb-icon">✅</div>
+      <div class="scb-info">
+        <h4 id="bannerTitle">—</h4>
+        <p id="bannerMeta">—</p>
+      </div>
+    </div>
+
+    <form id="registerForm" onsubmit="submitForm(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="firstName">First Name *</label>
+          <input type="text" id="firstName" placeholder="Jane" required>
+        </div>
+        <div class="form-group">
+          <label for="lastName">Last Name *</label>
+          <input type="text" id="lastName" placeholder="Doe" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email Address *</label>
+        <input type="email" id="email" placeholder="jane@example.com" required>
+      </div>
+
+      <div class="form-group">
+        <label for="phone">Phone Number</label>
+        <input type="tel" id="phone" placeholder="+1 (555) 000-0000">
+      </div>
+
+      <div class="form-group">
+        <label for="classSelect">Select Class *</label>
+        <select id="classSelect" required>
+          <option value="">— Choose a class —</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary form-submit" id="submitBtn">
+        Confirm Booking
+      </button>
+    </form>
+  </div>
+</div>
+
+<footer>
+  <span class="nav-logo">Serenity <span style="color:var(--gold)">Pilates</span></span>
+  <p>Move well, feel well, live well.</p>
+  <div class="footer-links">
+    <a href="index.html">Home</a>
+    <a href="schedule.html">Schedule</a>
+    <a href="register.html">Book a Class</a>
+  </div>
+  <div class="copyright">&copy; 2024 Serenity Pilates Studio.</div>
+</footer>
+
+<script>
+let allClasses = [];
+const params = new URLSearchParams(window.location.search);
+const preselectedId = params.get('classId');
+
+async function loadClasses() {
+  const res = await fetch('/api/classes');
+  allClasses = await res.json();
+
+  const select = document.getElementById('classSelect');
+  const now = new Date();
+
+  // Sort by date/time
+  const upcoming = allClasses
+    .filter(c => {
+      const d = new Date(`${c.date}T${c.time}`);
+      return d >= now;
+    })
+    .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+
+  if (upcoming.length === 0) {
+    select.innerHTML = '<option value="">No upcoming classes available</option>';
+    return;
+  }
+
+  upcoming.forEach(cls => {
+    const spotsLeft = cls.capacity - cls.registeredCount;
+    const isFull = spotsLeft <= 0;
+    const dateStr = formatDate(cls.date);
+    const opt = document.createElement('option');
+    opt.value = cls.id;
+    opt.textContent = `${cls.title} — ${dateStr} at ${cls.time}${isFull ? ' (Full)' : ` (${spotsLeft} spots left)`}`;
+    opt.disabled = isFull;
+    if (isFull) opt.style.color = '#aaa';
+    select.appendChild(opt);
+  });
+
+  if (preselectedId) {
+    select.value = preselectedId;
+    updateBanner(preselectedId);
+  }
+}
+
+function formatDate(dateStr) {
+  const [y, m, d] = dateStr.split('-');
+  const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${days[date.getDay()]}, ${months[parseInt(m)-1]} ${parseInt(d)}, ${y}`;
+}
+
+function updateBanner(classId) {
+  const cls = allClasses.find(c => c.id === classId);
+  if (!cls) { document.getElementById('classBanner').style.display = 'none'; return; }
+  const spotsLeft = cls.capacity - cls.registeredCount;
+  document.getElementById('bannerTitle').textContent = cls.title;
+  document.getElementById('bannerMeta').textContent = `${formatDate(cls.date)} at ${cls.time} · ${cls.duration} min · ${cls.instructor} · ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} remaining`;
+  document.getElementById('classBanner').style.display = 'flex';
+}
+
+document.getElementById('classSelect').addEventListener('change', function() {
+  updateBanner(this.value);
+});
+
+async function submitForm(e) {
+  e.preventDefault();
+  const alertBox = document.getElementById('alertBox');
+  alertBox.style.display = 'none';
+
+  const body = {
+    classId: document.getElementById('classSelect').value,
+    firstName: document.getElementById('firstName').value.trim(),
+    lastName: document.getElementById('lastName').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    phone: document.getElementById('phone').value.trim()
+  };
+
+  const btn = document.getElementById('submitBtn');
+  btn.textContent = 'Booking...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      showSuccess(body.firstName, body.classId);
+    } else {
+      alertBox.className = 'alert alert-error';
+      alertBox.textContent = data.error || 'Something went wrong. Please try again.';
+      alertBox.style.display = 'block';
+      btn.textContent = 'Confirm Booking';
+      btn.disabled = false;
+    }
+  } catch {
+    alertBox.className = 'alert alert-error';
+    alertBox.textContent = 'Network error. Please check your connection and try again.';
+    alertBox.style.display = 'block';
+    btn.textContent = 'Confirm Booking';
+    btn.disabled = false;
+  }
+}
+
+function showSuccess(firstName, classId) {
+  const cls = allClasses.find(c => c.id === classId);
+  const card = document.getElementById('formCard');
+  card.innerHTML = `
+    <div class="success-card">
+      <span class="success-icon">🎉</span>
+      <h3>You're All Set, ${firstName}!</h3>
+      <p>Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is confirmed.<br>
+      We're so excited to see you on the mat!</p>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+        <a href="schedule.html" class="btn btn-primary">View Schedule</a>
+        <a href="register.html" class="btn btn-outline">Book Another</a>
+      </div>
+    </div>`;
+}
+
+loadClasses();
+</script>
+</body>
+</html>
