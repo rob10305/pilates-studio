@@ -28,6 +28,12 @@ const pool = new Pool({
 // --- Middleware ---
 app.set('trust proxy', 1);
 
+// Request logger — remove after debugging
+app.use((req, res, next) => {
+  console.log(`[v2] ${req.method} ${req.path}`);
+  next();
+});
+
 app.use(session({
   store: new pgSession({ pool, tableName: 'user_sessions', createTableIfMissing: true }),
   secret: process.env.SESSION_SECRET || 'redmaple-dev-secret-change-in-production',
@@ -406,7 +412,7 @@ app.get('/api/registrations', async (req, res) => {
 initDB()
   .then(() => {
     const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Red Maple Movement running on port ${PORT}`);
+      console.log(`Red Maple Movement [v2] running on port ${PORT}`);
     });
     process.on('SIGTERM', () => {
       server.close(() => { pool.end(); console.log('Server closed.'); });
