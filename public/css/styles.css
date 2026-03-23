@@ -107,10 +107,10 @@ nav {
 }
 
 .btn-primary {
-  background: var(--red);
+  background: #820000;
   color: var(--white);
 }
-.btn-primary:hover { background: #99171C; color: var(--white); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(183,28,34,0.35); }
+.btn-primary:hover { background: #640000; color: var(--white); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(130,0,0,0.35); }
 
 .btn-outline {
   background: transparent;
@@ -164,7 +164,7 @@ section { padding: 80px 5%; }
 }
 
 .hero-content { max-width: 580px; position: relative; z-index: 1; }
-.hero-content .subtitle { color: var(--red); margin-bottom: 1rem; }
+.hero-content .subtitle { color: #820000; margin-bottom: 1rem; }
 .hero-content h1 { font-size: clamp(2rem, 4vw, 3.2rem); margin-bottom: 1.2rem; }
 .hero-content p { font-size: 1.1rem; color: var(--mid); margin-bottom: 2rem; max-width: 440px; }
 .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
