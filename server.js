@@ -39,7 +39,7 @@ function formatClassDate(dateStr) {
 
 const FROM_ADDRESS = 'Red Maple Movement <bookings@redmaplemovement.ca>';
 
-async function sendConfirmationEmail({ to, firstName, cls, registrationId }) {
+async function sendConfirmationEmail({ to, firstName, lastName, cls, registrationId }) {
   if (!process.env.RESEND_API_KEY) return;
   const cancelUrl = `${APP_URL}/api/registrations/${registrationId}/cancel?token=${cancelToken(registrationId)}`;
   await getResend().emails.send({
@@ -48,24 +48,31 @@ async function sendConfirmationEmail({ to, firstName, cls, registrationId }) {
     subject: `Booking Confirmed: ${cls.title} on ${formatClassDate(cls.date)}`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
-        <div style="background:#8B1A1A;padding:24px;text-align:center">
+        <div style="background:#820000;padding:24px;text-align:center">
           <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
         </div>
         <div style="padding:32px">
-          <h2 style="color:#8B1A1A">You're booked, ${firstName}!</h2>
-          <p>Your spot in <strong>${cls.title}</strong> has been confirmed.</p>
-          <div style="background:#f9f9f9;border-left:4px solid #8B1A1A;padding:16px;margin:24px 0;border-radius:4px">
+          <h2 style="color:#820000">You're booked, ${firstName}!</h2>
+          <p>Your spot in <strong>${cls.title}</strong> is reserved — please complete payment to confirm your place.</p>
+          <div style="background:#f9f9f9;border-left:4px solid #820000;padding:16px;margin:24px 0;border-radius:4px">
             <p style="margin:4px 0"><strong>Class:</strong> ${cls.title}</p>
             <p style="margin:4px 0"><strong>Date:</strong> ${formatClassDate(cls.date)}</p>
             <p style="margin:4px 0"><strong>Time:</strong> ${formatClassTime(cls.time)}</p>
             <p style="margin:4px 0"><strong>Instructor:</strong> ${cls.instructor}</p>
             <p style="margin:4px 0"><strong>Duration:</strong> ${cls.duration} minutes</p>
           </div>
+          <div style="background:#fff8e1;border:1.5px solid #f5c200;padding:20px;margin:24px 0;border-radius:6px">
+            <h3 style="margin:0 0 12px;color:#5a4000">💳 Payment Required — $28 CAD</h3>
+            <p style="margin:4px 0">Please send <strong>$28</strong> via <strong>Interac e-Transfer</strong> to:</p>
+            <p style="margin:10px 0;font-size:18px;font-weight:bold">amanda@redmaplemovement.ca</p>
+            <p style="margin:4px 0">Message / note: <em>${firstName} ${lastName} — ${cls.title} ${formatClassDate(cls.date)}</em></p>
+            <p style="margin:12px 0 0;font-size:12px;color:#666">Your spot is held pending payment. Cancellations made more than 24 hours before class start are fully refundable. See our <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.</p>
+          </div>
           <p>We'll send you a reminder 24 hours before your class.</p>
-          <p>Need to cancel? <a href="${cancelUrl}" style="color:#8B1A1A">Click here to cancel your booking</a>.</p>
+          <p>Need to cancel? <a href="${cancelUrl}" style="color:#820000">Click here to cancel your booking</a>.</p>
         </div>
         <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
-          Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#8B1A1A">${APP_URL}</a>
+          Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#820000">${APP_URL}</a>
         </div>
       </div>`
   });
@@ -317,6 +324,11 @@ async function initDB() {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL DEFAULT ''
     );
+  `);
+
+  // Add payment_status column to existing registrations tables
+  await pool.query(`
+    ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'pending';
   `);
 
   // Seed sample data if empty
@@ -624,11 +636,11 @@ async function createApp() {
       if (dupRows.length > 0) return res.status(409).json({ error: 'You are already registered for this class' });
       const registrationId = Date.now().toString();
       await pool.query(
-        `INSERT INTO registrations (id,"classId","firstName","lastName",email,phone,"registeredAt") VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [registrationId, classId, firstName, lastName, email, phone || '', new Date().toISOString()]
+        `INSERT INTO registrations (id,"classId","firstName","lastName",email,phone,"registeredAt",payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [registrationId, classId, firstName, lastName, email, phone || '', new Date().toISOString(), 'pending']
       );
-      res.status(201).json({ success: true, message: `You're booked! See you in class, ${firstName}.` });
-      sendConfirmationEmail({ to: email, firstName, cls, registrationId }).catch(e => console.error('Confirmation email error:', e.message));
+      res.status(201).json({ success: true, registrationId, message: `You're booked! See you in class, ${firstName}.` });
+      sendConfirmationEmail({ to: email, firstName, lastName, cls, registrationId }).catch(e => console.error('Confirmation email error:', e.message));
       getSetting('booking_notify_email').then(notifyEmail => {
         if (notifyEmail) sendNewBookingNotification({ notifyEmail, registrant: { firstName, lastName, email, phone }, cls }).catch(e => console.error('Notify email error:', e.message));
       });
@@ -645,7 +657,7 @@ async function createApp() {
       const enriched = rows.map(r => ({
         id: r.id, classId: r.classId, firstName: r.firstName,
         lastName: r.lastName, email: r.email, phone: r.phone,
-        registeredAt: r.registeredAt,
+        registeredAt: r.registeredAt, paymentStatus: r.payment_status,
         class: r.title ? { title: r.title, date: r.date, time: r.time, instructor: r.instructor } : null
       }));
       res.json(enriched);
@@ -671,12 +683,18 @@ async function createApp() {
   app.delete('/api/my-registrations/:id', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
     try {
-      const { rowCount } = await pool.query(
-        'DELETE FROM registrations WHERE id = $1 AND LOWER(email) = LOWER($2)',
-        [req.params.id, req.user.email]
-      );
-      if (rowCount === 0) return res.status(404).json({ error: 'Registration not found' });
-      res.json({ success: true });
+      const { rows } = await pool.query(`
+        SELECT r.*, c.date, c.time FROM registrations r
+        JOIN classes c ON c.id = r."classId"
+        WHERE r.id = $1 AND LOWER(r.email) = LOWER($2)
+      `, [req.params.id, req.user.email]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Registration not found' });
+      const reg = rows[0];
+      const classStart = new Date(`${reg.date}T${reg.time}`);
+      const hoursUntilClass = (classStart - new Date()) / (1000 * 60 * 60);
+      const refundEligible = hoursUntilClass > 24;
+      await pool.query('DELETE FROM registrations WHERE id = $1', [req.params.id]);
+      res.json({ success: true, refundEligible });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
@@ -716,6 +734,18 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
+  // Admin: mark a registration as paid
+  app.post('/api/admin/registrations/:id/mark-paid', requireAdmin, async (req, res) => {
+    try {
+      const { rowCount } = await pool.query(
+        `UPDATE registrations SET payment_status = 'paid' WHERE id = $1`,
+        [req.params.id]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: 'Registration not found' });
+      res.json({ success: true });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
   // Admin: remove a user from a class + send notification email
   app.delete('/api/admin/registrations/:id', requireAdmin, async (req, res) => {
     try {
@@ -742,17 +772,33 @@ async function createApp() {
     if (!token || token !== cancelToken(id))
       return res.status(400).send('<h2>Invalid or expired cancellation link.</h2>');
     try {
-      const { rowCount } = await pool.query('DELETE FROM registrations WHERE id = $1', [id]);
-      if (rowCount === 0) return res.send('<h2>This booking has already been cancelled.</h2>');
+      const { rows } = await pool.query(`
+        SELECT r.*, c.date, c.time, c.title
+        FROM registrations r JOIN classes c ON c.id = r."classId"
+        WHERE r.id = $1
+      `, [id]);
+      if (rows.length === 0) return res.send('<h2>This booking has already been cancelled.</h2>');
+      const reg = rows[0];
+      const classStart = new Date(`${reg.date}T${reg.time}`);
+      const hoursUntilClass = (classStart - new Date()) / (1000 * 60 * 60);
+      const refundEligible = hoursUntilClass > 24;
+
+      await pool.query('DELETE FROM registrations WHERE id = $1', [id]);
+
+      const refundMsg = refundEligible
+        ? '<p>As you cancelled more than 24 hours before the class, your $28 payment will be refunded within 2–3 business days.</p>'
+        : '<p style="color:#9b3a3a"><strong>Note:</strong> Cancellations within 24 hours of class start are not eligible for a refund per our <a href="' + APP_URL + '/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.</p>';
+
       res.send(`
         <div style="font-family:Arial,sans-serif;max-width:500px;margin:80px auto;text-align:center;color:#333">
-          <div style="background:#8B1A1A;padding:20px;border-radius:8px 8px 0 0">
+          <div style="background:#820000;padding:20px;border-radius:8px 8px 0 0">
             <h1 style="color:#fff;margin:0">Red Maple Movement</h1>
           </div>
           <div style="border:1px solid #ddd;border-top:none;padding:40px;border-radius:0 0 8px 8px">
-            <h2 style="color:#8B1A1A">Booking Cancelled</h2>
-            <p>Your booking has been successfully cancelled. We hope to see you in a future class!</p>
-            <a href="${APP_URL}" style="display:inline-block;background:#8B1A1A;color:#fff;padding:12px 28px;border-radius:4px;text-decoration:none;margin-top:16px">Back to Red Maple Movement</a>
+            <h2 style="color:#820000">Booking Cancelled</h2>
+            <p>Your booking for <strong>${reg.title}</strong> has been successfully cancelled.</p>
+            ${refundMsg}
+            <a href="${APP_URL}" style="display:inline-block;background:#820000;color:#fff;padding:12px 28px;border-radius:4px;text-decoration:none;margin-top:16px">Back to Red Maple Movement</a>
           </div>
         </div>`);
     } catch (e) { console.error(e); res.status(500).send('<h2>Something went wrong. Please try again.</h2>'); }

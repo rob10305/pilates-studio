@@ -117,7 +117,7 @@
         </div>
       </div>
 
-      <p style="font-size:0.88rem;color:var(--mid);margin-bottom:1rem">Class fee: <strong>$25</strong> — Payment is required upon registration.</p>
+      <p style="font-size:0.88rem;color:var(--mid);margin-bottom:1rem">Class fee: <strong>$28</strong> — Payment via Interac e-Transfer is required upon booking. See our <a href="cancellation-policy.html" style="color:var(--red)">Cancellation Policy</a>.</p>
 
       <button type="submit" class="btn btn-primary form-submit" id="submitBtn">
         Confirm Booking
@@ -134,6 +134,7 @@
     <a href="index.html">Home</a>
     <a href="schedule.html">Schedule</a>
     <a href="register.html">Book a Class</a>
+    <a href="cancellation-policy.html">Cancellation Policy</a>
   </div>
   <div class="copyright">&copy; 2026 Red Maple Movement Studio. | Version 1.0</div>
 </footer>
@@ -290,7 +291,7 @@ async function submitForm(e) {
     const data = await res.json();
 
     if (res.ok) {
-      showSuccess(body.firstName, body.classId);
+      showSuccess(body.firstName, body.lastName, body.classId);
     } else {
       alertBox.className = 'alert alert-error';
       alertBox.textContent = data.error || 'Something went wrong. Please try again.';
@@ -307,15 +308,24 @@ async function submitForm(e) {
   }
 }
 
-function showSuccess(firstName, classId) {
+function showSuccess(firstName, lastName, classId) {
   const cls = allClasses.find(c => c.id === classId);
+  const clsDate = cls ? formatDate(cls.date) : '';
   const card = document.getElementById('formCard');
   card.innerHTML = `
     <div class="success-card">
-      <span class="success-icon">🎉</span>
-      <h3>You're All Set, ${firstName}!</h3>
-      <p>Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is confirmed.<br>
-      We're so excited to see you on the mat!</p>
+      <span class="success-icon">✅</span>
+      <h3>Spot Reserved, ${firstName}!</h3>
+      <p>Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is held — complete payment to confirm.</p>
+
+      <div style="background:#fff8e1;border:1.5px solid #f5c200;border-radius:10px;padding:1.25rem 1.5rem;margin:1.5rem 0;text-align:left">
+        <p style="font-weight:700;font-size:1rem;margin-bottom:0.5rem">💳 Complete Your Payment</p>
+        <p style="font-size:0.9rem;margin-bottom:0.4rem">Send <strong>$28 CAD</strong> via <strong>Interac e-Transfer</strong> to:</p>
+        <p style="font-size:1.1rem;font-weight:700;color:#820000;margin-bottom:0.4rem">amanda@redmaplemovement.ca</p>
+        <p style="font-size:0.85rem;color:#5a4000;margin-bottom:0.4rem">Message: <em>${firstName} ${lastName}${cls ? ' — ' + cls.title + ' ' + clsDate : ''}</em></p>
+        <p style="font-size:0.8rem;color:#888;margin-top:0.75rem">Your spot is held for 24 hours pending payment. Cancellations more than 24 hours before class start are fully refundable. <a href="cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
+      </div>
+
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
         <a href="my-schedule.html" class="btn btn-primary">View My Schedule</a>
         <a href="register.html" class="btn btn-outline">Book Another</a>

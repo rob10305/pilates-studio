@@ -228,6 +228,7 @@
     <a href="index.html">Home</a>
     <a href="schedule.html">Schedule</a>
     <a href="register.html">Book a Class</a>
+    <a href="cancellation-policy.html">Cancellation Policy</a>
   </div>
   <div class="copyright">&copy; 2026 Red Maple Movement Studio. | Version 1.0</div>
 </footer>
@@ -577,24 +578,45 @@ function loadRoster() {
           <th style="padding:8px 12px">Email</th>
           <th style="padding:8px 12px">Phone</th>
           <th style="padding:8px 12px">Registered</th>
+          <th style="padding:8px 12px">Payment</th>
           <th style="padding:8px 12px"></th>
         </tr>
       </thead>
       <tbody>
-        ${regs.map(r => `
+        ${regs.map(r => {
+          const paid = r.payment_status === 'paid';
+          const payBadge = paid
+            ? '<span style="background:#d4edda;color:#155724;font-size:0.72rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:50px">Paid</span>'
+            : '<span style="background:#fff3cd;color:#856404;font-size:0.72rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:50px">Pending</span>';
+          return `
           <tr style="border-bottom:1px solid #f0f0f0" id="reg-row-${r.id}">
             <td style="padding:10px 12px;font-weight:600">${r.firstName} ${r.lastName}</td>
             <td style="padding:10px 12px"><a href="mailto:${r.email}" style="color:var(--red)">${r.email}</a></td>
             <td style="padding:10px 12px;color:var(--mid)">${r.phone || '—'}</td>
             <td style="padding:10px 12px;color:var(--mid);white-space:nowrap">${new Date(r.registeredAt).toLocaleDateString('en-CA')}</td>
-            <td style="padding:10px 12px;text-align:right">
+            <td style="padding:10px 12px">${payBadge}</td>
+            <td style="padding:10px 12px;text-align:right;display:flex;gap:0.4rem;justify-content:flex-end">
+              ${!paid ? `<button style="background:#d4edda;color:#155724;border:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.78rem;font-weight:700;cursor:pointer"
+                onclick="markPaid('${r.id}')">Mark Paid</button>` : ''}
               <button class="btn-danger" style="font-size:0.78rem;padding:0.3rem 0.75rem"
                 onclick="removeRegistration('${r.id}', '${r.firstName} ${r.lastName}')">Remove</button>
             </td>
-          </tr>`).join('')}
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>
     <p style="margin-top:0.75rem;font-size:0.8rem;color:var(--mid)">${regs.length} of ${cls ? cls.capacity : '?'} spots filled · Removing a registrant will send them an email notification.</p>`;
+}
+
+async function markPaid(regId) {
+  const res = await fetch(`/api/admin/registrations/${regId}/mark-paid`, { method: 'POST' });
+  if (res.ok) {
+    loadRoster();
+    const alert = document.getElementById('dashboardAlert');
+    alert.className = 'alert alert-success';
+    alert.textContent = 'Payment marked as received.';
+    alert.style.display = 'block';
+  }
 }
 
 async function removeRegistration(regId, name) {

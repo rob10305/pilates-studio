@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cancellation Policy — Red Maple Movement | Pilates</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .policy-wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 5% 80px;
+    }
+    .policy-wrap h2 {
+      font-size: 1.4rem;
+      margin: 2rem 0 0.6rem;
+      color: var(--charcoal);
+    }
+    .policy-wrap p, .policy-wrap li {
+      color: var(--mid);
+      font-size: 1rem;
+      line-height: 1.8;
+      margin-bottom: 0.75rem;
+    }
+    .policy-wrap ul {
+      padding-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .policy-wrap .highlight-box {
+      background: #fff8e1;
+      border-left: 4px solid #f5c200;
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+    .policy-wrap .highlight-box p {
+      margin: 0;
+      color: #5a4000;
+      font-weight: 600;
+    }
+    .effective-date {
+      font-size: 0.85rem;
+      color: var(--light);
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></a>
+  <button class="nav-toggle" id="navToggle" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="about.html">About Me</a></li>
+    <li><a href="schedule.html">Schedule</a></li>
+    <li><a href="waiver.html">Forms</a></li>
+    <li id="adminNav" style="display:none"><a href="admin.html">Admin</a></li>
+    <li id="myScheduleNav" style="display:none"><a href="my-schedule.html">My Schedule</a></li>
+    <li id="authNav"></li>
+  </ul>
+</nav>
+
+<div class="page-hero">
+  <p class="subtitle">Policies</p>
+  <h1>Cancellation Policy</h1>
+</div>
+
+<div class="policy-wrap">
+
+  <p class="effective-date">Effective date: March 2026</p>
+
+  <p>At Red Maple Movement, we understand that life happens. This policy outlines how cancellations and refunds are handled for class bookings so that everyone — instructors and participants alike — can plan with confidence.</p>
+
+  <h2>Class Fee</h2>
+  <p>Each mat Pilates class is <strong>$28 CAD</strong>, payable via Interac e-Transfer at the time of booking. Your spot is held for 24 hours pending receipt of payment. Spots not paid within 24 hours may be released.</p>
+
+  <div class="highlight-box">
+    <p>Send payment to: amanda@redmaplemovement.ca — include your name and class date as the message.</p>
+  </div>
+
+  <h2>Cancellation &amp; Refund Window</h2>
+  <ul>
+    <li><strong>More than 24 hours before class start:</strong> Full refund of $28. Cancellations in this window are eligible for a complete refund, processed within 2–3 business days via e-Transfer.</li>
+    <li><strong>Within 24 hours of class start:</strong> No refund. Due to limited class sizes, cancellations within 24 hours cannot be refunded, as it is unlikely the spot can be filled on short notice.</li>
+  </ul>
+
+  <h2>How to Cancel</h2>
+  <p>You can cancel your booking in two ways:</p>
+  <ul>
+    <li>Use the cancellation link included in your booking confirmation email.</li>
+    <li>Sign in to your account and cancel from the <a href="my-schedule.html" style="color:var(--red)">My Schedule</a> page.</li>
+  </ul>
+  <p>The cancellation time is recorded at the moment you submit your cancellation. Please ensure you cancel in advance to remain within the refund window.</p>
+
+  <h2>Class Cancellation by Red Maple Movement</h2>
+  <p>In the unlikely event that a class is cancelled by the instructor, all registered participants will receive a full refund regardless of when the cancellation occurs. You will be notified by email as soon as possible.</p>
+
+  <h2>No-Shows</h2>
+  <p>Failure to attend a class without cancelling is treated as a cancellation within 24 hours and is not eligible for a refund.</p>
+
+  <h2>Questions</h2>
+  <p>If you have questions about this policy or a specific booking, please reach out at <a href="mailto:amanda@redmaplemovement.ca" style="color:var(--red)">amanda@redmaplemovement.ca</a>.</p>
+
+  <div style="margin-top:2.5rem">
+    <a href="register.html" class="btn btn-primary">Reserve Your Spot</a>
+  </div>
+
+</div>
+
+<footer>
+  <span class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></span>
+  <p>Move with Intention. Transform with Strength.</p>
+  <p style="margin-bottom:0.5rem">Questions? Reach us at <a href="mailto:amanda@redmaplemovement.ca" style="color:var(--red-lt)">amanda@redmaplemovement.ca</a></p>
+  <div class="footer-links">
+    <a href="index.html">Home</a>
+    <a href="schedule.html">Schedule</a>
+    <a href="register.html">Book</a>
+    <a href="cancellation-policy.html">Cancellation Policy</a>
+  </div>
+  <div class="copyright">&copy; 2026 Red Maple Movement Studio. All rights reserved. | Version 1.0</div>
+</footer>
+
+<script>
+document.getElementById('navToggle').addEventListener('click', function () {
+  this.classList.toggle('open');
+  document.getElementById('navLinks').classList.toggle('open');
+});
+</script>
+<script src="js/auth.js"></script>
+</body>
+</html>
