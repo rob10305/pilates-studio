@@ -23,6 +23,12 @@
         await fetch('/auth/logout', { method: 'POST' });
         window.location.reload();
       });
+      const mySchedNav = document.getElementById('myScheduleNav');
+      if (mySchedNav) mySchedNav.style.display = 'list-item';
+      if (user.isAdmin) {
+        const adminNav = document.getElementById('adminNav');
+        if (adminNav) adminNav.style.display = 'list-item';
+      }
     } else {
       li.innerHTML = `<a href="login.html">Sign In</a>`;
     }

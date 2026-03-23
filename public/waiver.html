@@ -133,8 +133,9 @@
     <li><a href="index.html">Home</a></li>
     <li><a href="about.html">About Me</a></li>
     <li><a href="schedule.html">Schedule</a></li>
-    <li><a href="register.html">Book</a></li>
     <li><a href="waiver.html" class="active">Forms</a></li>
+    <li id="adminNav" style="display:none"><a href="admin.html">Admin</a></li>
+    <li id="myScheduleNav" style="display:none"><a href="my-schedule.html">My Schedule</a></li>
     <li id="authNav"></li>
   </ul>
 </nav>
@@ -251,7 +252,7 @@
       </div>
       <div class="form-group">
         <label for="wPhone">Phone Number</label>
-        <input type="tel" id="wPhone" placeholder="+1 (555) 000-0000">
+        <input type="tel" id="wPhone" placeholder="905 000 000">
       </div>
     </div>
     <div class="form-row">
@@ -261,7 +262,7 @@
       </div>
       <div class="form-group">
         <label for="wEmergencyPhone">Emergency Contact Phone</label>
-        <input type="tel" id="wEmergencyPhone" placeholder="+1 (555) 000-0000">
+        <input type="tel" id="wEmergencyPhone" placeholder="905 000 000">
       </div>
     </div>
     <div class="form-group">
@@ -297,23 +298,23 @@
     <h3>Declarations</h3>
 
     <div class="check-row" onclick="toggle('chkRead')">
-      <input type="checkbox" id="chkRead">
-      <label for="chkRead">I confirm that I have scrolled through and read the entire waiver above.</label>
+      <input type="checkbox" id="chkRead" onclick="event.stopPropagation()">
+      <label for="chkRead" onclick="event.stopPropagation()">I confirm that I have scrolled through and read the entire waiver above.</label>
     </div>
 
     <div class="check-row" onclick="toggle('chkUnderstand')">
-      <input type="checkbox" id="chkUnderstand">
-      <label for="chkUnderstand">I understand that by signing I am giving up my right to sue Red Maple Movement Studio and its instructors for injuries or damages, including those caused by negligence.</label>
+      <input type="checkbox" id="chkUnderstand" onclick="event.stopPropagation()">
+      <label for="chkUnderstand" onclick="event.stopPropagation()">I understand that by signing I am giving up my right to sue Red Maple Movement Studio and its instructors for injuries or damages, including those caused by negligence.</label>
     </div>
 
     <div class="check-row" onclick="toggle('chkVoluntary')">
-      <input type="checkbox" id="chkVoluntary">
-      <label for="chkVoluntary">I am signing this agreement voluntarily, without coercion, and on behalf of myself (and my heirs and estate).</label>
+      <input type="checkbox" id="chkVoluntary" onclick="event.stopPropagation()">
+      <label for="chkVoluntary" onclick="event.stopPropagation()">I am signing this agreement voluntarily, without coercion, and on behalf of myself (and my heirs and estate).</label>
     </div>
 
     <div class="check-row" onclick="toggle('chkHealth')">
-      <input type="checkbox" id="chkHealth">
-      <label for="chkHealth">I confirm that I am in good physical health, and have disclosed any medical conditions or injuries above.</label>
+      <input type="checkbox" id="chkHealth" onclick="event.stopPropagation()">
+      <label for="chkHealth" onclick="event.stopPropagation()">I confirm that I am in good physical health, and have disclosed any medical conditions or injuries above.</label>
     </div>
   </div>
 
@@ -327,13 +328,12 @@
 
 <footer>
   <span class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></span>
-  <p>Move with Intention. Build Inner Strength.</p>
+  <p>Move with Intention. Transform with Strength.</p>
   <p style="margin-bottom:0.5rem">Questions? Feel free to reach out – <a href="mailto:amanda@redmaplemovement.ca" style="color:var(--red-lt)">amanda@redmaplemovement.ca</a></p>
   <div class="footer-links">
     <a href="index.html">Home</a>
     <a href="schedule.html">Schedule</a>
     <a href="register.html">Book</a>
-    <a href="admin.html">Admin</a>
   </div>
   <div class="copyright">&copy; 2024 Red Maple Movement Studio. All rights reserved.</div>
 </footer>
@@ -452,20 +452,38 @@ async function submitWaiver() {
 
 function showSuccess(waiverData) {
   const layout = document.querySelector('.waiver-layout');
-  layout.innerHTML = `
-    <div style="text-align:center;padding:3rem 1rem">
-      <div style="font-size:4rem;margin-bottom:1rem">✅</div>
-      <h2 style="font-family:'Playfair Display',serif;font-size:2rem;margin-bottom:0.75rem">Waiver Signed!</h2>
-      <p style="color:var(--mid);max-width:480px;margin:0 auto 2rem">
-        Thank you, <strong>${esc(waiverData.firstName)}</strong>. Your signed waiver has been saved.
-        You're all set to join class at Red Maple Movement.
-      </p>
-      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick='generatePDF(${JSON.stringify(waiverData)})'>Download My Signed Copy</button>
-        <a href="register.html" class="btn btn-outline">Reserve Your Spot</a>
+  const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+
+  if (returnTo) {
+    // Came from booking flow — redirect back to complete the registration
+    layout.innerHTML = `
+      <div style="text-align:center;padding:3rem 1rem">
+        <div style="font-size:4rem;margin-bottom:1rem">✅</div>
+        <h2 style="font-family:'Playfair Display',serif;font-size:2rem;margin-bottom:0.75rem">Waiver Signed!</h2>
+        <p style="color:var(--mid);max-width:480px;margin:0 auto 1.5rem">
+          Thank you, <strong>${esc(waiverData.firstName)}</strong>. Your waiver has been saved —
+          taking you back to complete your booking now…
+        </p>
+        <div style="font-size:0.85rem;color:var(--mid)">Redirecting in a moment…</div>
       </div>
-    </div>
-  `;
+    `;
+    setTimeout(() => { window.location.href = returnTo; }, 2000);
+  } else {
+    layout.innerHTML = `
+      <div style="text-align:center;padding:3rem 1rem">
+        <div style="font-size:4rem;margin-bottom:1rem">✅</div>
+        <h2 style="font-family:'Playfair Display',serif;font-size:2rem;margin-bottom:0.75rem">Waiver Signed!</h2>
+        <p style="color:var(--mid);max-width:480px;margin:0 auto 2rem">
+          Thank you, <strong>${esc(waiverData.firstName)}</strong>. Your signed waiver has been saved.
+          You're all set to join class at Red Maple Movement.
+        </p>
+        <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick='generatePDF(${JSON.stringify(waiverData)})'>Download My Signed Copy</button>
+          <a href="register.html" class="btn btn-outline">Reserve Your Spot</a>
+        </div>
+      </div>
+    `;
+  }
 }
 
 // ── PDF generation (jsPDF, client-side) ──────────────────────────

@@ -7,6 +7,35 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .waiver-required-box {
+      background: #fff8f0;
+      border: 1.5px solid #f0c080;
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      margin-bottom: 1.25rem;
+    }
+    .waiver-required-box .wrb-icon { font-size: 1.75rem; flex-shrink: 0; line-height: 1; }
+    .waiver-required-box h4 { font-size: 1rem; margin: 0 0 0.35rem; color: #7a4800; }
+    .waiver-required-box p  { font-size: 0.85rem; color: #5a3800; margin: 0 0 0.6rem; line-height: 1.55; }
+    .waiver-required-box p:last-of-type { margin-bottom: 0.85rem; }
+    .waiver-done-banner {
+      background: #f0f7f0;
+      border: 1.5px solid #a8d5a8;
+      border-radius: var(--radius);
+      padding: 0.9rem 1.25rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      font-size: 0.88rem;
+      color: #2d6a2d;
+      font-weight: 600;
+    }
+  </style>
 </head>
 <body>
 
@@ -19,6 +48,8 @@
     <li><a href="schedule.html">Schedule</a></li>
     <li><a href="register.html" class="active">Book</a></li>
     <li><a href="waiver.html">Forms</a></li>
+    <li id="adminNav" style="display:none"><a href="admin.html">Admin</a></li>
+    <li id="myScheduleNav" style="display:none"><a href="my-schedule.html">My Schedule</a></li>
     <li id="authNav"></li>
   </ul>
 </nav>
@@ -75,6 +106,17 @@
         </select>
       </div>
 
+      <!-- Waiver required prompt (shown if waiver not yet signed) -->
+      <div id="waiverRequired" class="waiver-required-box" style="display:none">
+        <div class="wrb-icon">📋</div>
+        <div>
+          <h4>Waiver Required Before Booking</h4>
+          <p>Red Maple Movement requires all participants to sign a health &amp; safety waiver before attending their first class. <strong>It's a one-time process</strong> — once signed, your waiver is valid for all future classes.</p>
+          <p>Your booking details are saved. After signing the waiver you'll be brought straight back here to complete your registration.</p>
+          <a id="waiverLink" href="waiver.html" class="btn btn-primary" style="font-size:0.9rem">Sign Waiver Now →</a>
+        </div>
+      </div>
+
       <button type="submit" class="btn btn-primary form-submit" id="submitBtn">
         Confirm Booking
       </button>
@@ -98,6 +140,16 @@
 let allClasses = [];
 const params = new URLSearchParams(window.location.search);
 const preselectedId = params.get('classId');
+
+// ── Restore pending booking after returning from waiver ──────────
+let pendingAutoSubmit = null;
+if (params.get('waiverDone') === '1') {
+  const saved = sessionStorage.getItem('pendingBooking');
+  if (saved) {
+    pendingAutoSubmit = JSON.parse(saved);
+    sessionStorage.removeItem('pendingBooking');
+  }
+}
 
 async function loadClasses() {
   const res = await fetch('/api/classes');
@@ -135,6 +187,24 @@ async function loadClasses() {
     select.value = preselectedId;
     updateBanner(preselectedId);
   }
+
+  // Auto-submit pending booking after returning from waiver signing
+  if (pendingAutoSubmit) {
+    const { classId, firstName, lastName, email, phone } = pendingAutoSubmit;
+    document.getElementById('firstName').value = firstName;
+    document.getElementById('lastName').value  = lastName;
+    document.getElementById('email').value     = email;
+    document.getElementById('phone').value     = phone || '';
+    if (classId) { select.value = classId; updateBanner(classId); }
+
+    // Show a "waiver signed" confirmation banner above the form
+    const alertBox = document.getElementById('alertBox');
+    alertBox.className = 'waiver-done-banner';
+    alertBox.innerHTML = '✅ &nbsp;Waiver signed — completing your booking now…';
+    alertBox.style.display = 'flex';
+
+    setTimeout(() => submitForm({ preventDefault: () => {} }), 600);
+  }
 }
 
 function formatDate(dateStr) {
@@ -171,9 +241,43 @@ async function submitForm(e) {
     phone: document.getElementById('phone').value.trim()
   };
 
+  if (!body.classId || !body.firstName || !body.lastName || !body.email) {
+    alertBox.className = 'alert alert-error';
+    alertBox.textContent = 'Please fill in all required fields.';
+    alertBox.style.display = 'block';
+    return;
+  }
+
   const btn = document.getElementById('submitBtn');
-  btn.textContent = 'Booking...';
+  btn.textContent = 'Checking…';
   btn.disabled = true;
+
+  // ── Step 1: Verify waiver ──────────────────────────────────────
+  try {
+    const waiverRes = await fetch(`/api/waiver/check?email=${encodeURIComponent(body.email)}`);
+    const waiverData = await waiverRes.json();
+
+    if (!waiverData.signed) {
+      // Save booking state so we can resume after waiver is signed
+      sessionStorage.setItem('pendingBooking', JSON.stringify(body));
+
+      // Build return URL — waiver.html will redirect here after signing
+      const returnUrl = `register.html?classId=${encodeURIComponent(body.classId)}&waiverDone=1`;
+      document.getElementById('waiverLink').href = `waiver.html?returnTo=${encodeURIComponent(returnUrl)}`;
+
+      document.getElementById('waiverRequired').style.display = 'flex';
+      btn.textContent = 'Confirm Booking';
+      btn.disabled = false;
+      document.getElementById('waiverRequired').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
+  } catch (_) {
+    // If waiver check fails, allow booking to proceed (fail open)
+  }
+
+  // ── Step 2: Submit registration ────────────────────────────────
+  document.getElementById('waiverRequired').style.display = 'none';
+  btn.textContent = 'Booking…';
 
   try {
     const res = await fetch('/api/register', {
@@ -211,7 +315,7 @@ function showSuccess(firstName, classId) {
       <p>Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is confirmed.<br>
       We're so excited to see you on the mat!</p>
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
-        <a href="schedule.html" class="btn btn-primary">View Schedule</a>
+        <a href="my-schedule.html" class="btn btn-primary">View My Schedule</a>
         <a href="register.html" class="btn btn-outline">Book Another</a>
       </div>
     </div>`;

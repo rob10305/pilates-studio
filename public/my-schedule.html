@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Schedule — Red Maple Movement | Pilates</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .my-schedule-wrap { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    .section-heading {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.3rem;
+      color: var(--dark);
+      margin: 2rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--red);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .booking-card {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      transition: box-shadow 0.2s;
+    }
+    .booking-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.09); }
+    .booking-card.past { opacity: 0.55; }
+
+    .booking-date-badge {
+      background: var(--red);
+      color: #fff;
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      text-align: center;
+      min-width: 52px;
+      flex-shrink: 0;
+    }
+    .booking-date-badge .badge-month { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .booking-date-badge .badge-day   { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+
+    .booking-info { flex: 1; }
+    .booking-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--dark); margin-bottom: 0.25rem; }
+    .booking-meta  { font-size: 0.82rem; color: var(--mid); display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.35rem; }
+    .booking-meta span { display: flex; align-items: center; gap: 4px; }
+
+    .booking-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+
+    .btn-cancel {
+      background: transparent;
+      border: 1.5px solid #c0392b;
+      color: #c0392b;
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-cancel:hover { background: #c0392b; color: #fff; }
+
+    /* Empty state — show calendar */
+    .no-bookings-msg {
+      text-align: center;
+      padding: 2rem 1rem 1rem;
+      color: var(--mid);
+    }
+    .no-bookings-msg .big-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+    .no-bookings-msg h3 { font-family: 'Playfair Display', serif; color: var(--dark); margin-bottom: 0.5rem; }
+
+    .calendar-section { margin-top: 2.5rem; }
+
+    @media (max-width: 560px) {
+      .booking-card { flex-wrap: wrap; }
+      .booking-actions { width: 100%; justify-content: flex-end; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></a>
+  <button class="nav-toggle" id="navToggle" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="about.html">About Me</a></li>
+    <li><a href="schedule.html">Schedule</a></li>
+    <li><a href="waiver.html">Forms</a></li>
+    <li id="adminNav" style="display:none"><a href="admin.html">Admin</a></li>
+    <li id="myScheduleNav" style="display:none"><a href="my-schedule.html" class="active">My Schedule</a></li>
+    <li id="authNav"></li>
+  </ul>
+</nav>
+
+<div class="page-hero">
+  <p class="subtitle">Your Upcoming Classes</p>
+  <h1>My Schedule</h1>
+  <p>View and manage your booked classes.</p>
+</div>
+
+<div class="my-schedule-wrap">
+  <div id="scheduleContent">
+    <div class="empty-state" style="padding:3rem 0">
+      <div style="font-size:2rem">⏳</div>
+      <p>Loading your schedule…</p>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar section — always shown below booked classes -->
+<div id="calendarSection" style="display:none" class="my-schedule-wrap">
+  <div class="section-heading calendar-section">📅 Available Classes — Book a Spot</div>
+  <div class="schedule-layout" style="margin-top:1rem">
+    <div>
+      <div class="calendar-wrap">
+        <div class="calendar-header">
+          <button class="cal-nav" id="prevMonth">&#8249;</button>
+          <h3 id="calMonthLabel">Month Year</h3>
+          <button class="cal-nav" id="nextMonth">&#8250;</button>
+        </div>
+        <div class="calendar-grid" id="calGrid"></div>
+      </div>
+      <div style="margin-top:1rem;display:flex;gap:1.5rem;padding:0 0.25rem;font-size:0.82rem;color:var(--mid)">
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block"></span> Available</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--light);display:inline-block"></span> Full</span>
+      </div>
+    </div>
+    <div class="class-panel">
+      <div class="class-panel-header">
+        <h3 id="panelTitle">Select a Date</h3>
+        <p id="panelSubtitle">Click a highlighted date to view classes</p>
+      </div>
+      <div class="class-list" id="classList">
+        <div class="empty-state"><div style="font-size:2.5rem">📅</div><p>Select a date on the calendar to view available classes.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></span>
+  <p>Move well, feel well, live well.</p>
+  <p style="margin-bottom:0.5rem">Questions? Reach us at <a href="mailto:Amanda@redmaplemovement.ca" style="color:var(--red-lt)">Amanda@redmaplemovement.ca</a></p>
+  <div class="footer-links">
+    <a href="index.html">Home</a>
+    <a href="schedule.html">Schedule</a>
+    <a href="register.html">Book a Class</a>
+  </div>
+  <div class="copyright">&copy; 2024 Red Maple Movement Studio.</div>
+</footer>
+
+<script>
+const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const dayNames   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+function formatTime(t) {
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+function formatFullDate(dateStr) {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, mo - 1, d);
+  return `${dayNames[dt.getDay()]}, ${monthNames[mo-1]} ${d}, ${y}`;
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Load and render user's registrations ──────────────────────────────────────
+async function loadMySchedule() {
+  const res = await fetch('/auth/me');
+  if (!res.ok) { window.location.href = 'login.html?next=my-schedule.html'; return; }
+
+  const regRes = await fetch('/api/my-registrations');
+  if (!regRes.ok) {
+    document.getElementById('scheduleContent').innerHTML =
+      '<p style="color:red;text-align:center">Failed to load schedule.</p>';
+    return;
+  }
+
+  const registrations = await regRes.json();
+  const now = new Date();
+  const upcoming = registrations.filter(r => new Date(`${r.date}T${r.time}`) >= now);
+  const past     = registrations.filter(r => new Date(`${r.date}T${r.time}`) < now);
+
+  let html = '';
+
+  if (upcoming.length > 0) {
+    html += `<div class="section-heading">✅ My Upcoming Classes (${upcoming.length})</div>`;
+    html += upcoming.map(r => bookingCard(r, false)).join('');
+  } else {
+    html += `<div class="no-bookings-msg">
+      <div class="big-icon">📋</div>
+      <h3>No upcoming classes booked</h3>
+      <p>Browse the available classes below and book your spot!</p>
+    </div>`;
+  }
+
+  if (past.length > 0) {
+    html += `<div class="section-heading" style="margin-top:2.5rem;color:var(--mid);border-color:#ddd">🕘 Past Classes</div>`;
+    html += past.map(r => bookingCard(r, true)).join('');
+  }
+
+  document.getElementById('scheduleContent').innerHTML = html;
+
+  // Attach cancel listeners
+  document.querySelectorAll('.cancel-btn').forEach(btn => {
+    btn.addEventListener('click', () => cancelRegistration(btn.dataset.id, btn.dataset.title));
+  });
+
+  // Always show the available classes calendar below
+  document.getElementById('calendarSection').style.display = 'block';
+  loadCalendar();
+}
+
+function bookingCard(r, isPast) {
+  const [y, mo, d] = r.date.split('-').map(Number);
+  return `
+    <div class="booking-card${isPast ? ' past' : ''}">
+      <div class="booking-date-badge">
+        <div class="badge-month">${monthShort[mo-1]}</div>
+        <div class="badge-day">${d}</div>
+      </div>
+      <div class="booking-info">
+        <div class="booking-title">${esc(r.title)}</div>
+        <div class="booking-meta">
+          <span>🕐 ${formatTime(r.time)}</span>
+          <span>⏱ ${r.duration} min</span>
+          <span>👤 ${esc(r.instructor)}</span>
+        </div>
+        <div style="font-size:0.78rem;color:var(--mid);margin-top:0.35rem">${formatFullDate(r.date)}</div>
+      </div>
+      ${!isPast ? `
+      <div class="booking-actions">
+        <button class="btn-cancel cancel-btn" data-id="${esc(r.id)}" data-title="${esc(r.title)}">Cancel</button>
+      </div>` : ''}
+    </div>`;
+}
+
+async function cancelRegistration(id, title) {
+  if (!confirm(`Cancel your booking for "${title}"?`)) return;
+  const res = await fetch(`/api/my-registrations/${id}`, { method: 'DELETE' });
+  if (res.ok) {
+    loadMySchedule();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || 'Failed to cancel. Please try again.');
+  }
+}
+
+// ── Calendar ───────────────────────────────────────────────────────────────────
+let allClasses = [];
+let currentDate = new Date();
+let selectedDate = null;
+
+async function loadCalendar() {
+  const res = await fetch('/api/classes');
+  allClasses = await res.json();
+  renderCalendar();
+}
+
+function formatDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function renderCalendar() {
+  const grid  = document.getElementById('calGrid');
+  const label = document.getElementById('calMonthLabel');
+  const year  = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  label.textContent = `${monthNames[month]} ${year}`;
+  grid.innerHTML = '';
+
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-day-name'; el.textContent = d; grid.appendChild(el);
+  });
+
+  const firstDay      = new Date(year, month, 1).getDay();
+  const daysInMonth   = new Date(year, month + 1, 0).getDate();
+  const daysInPrev    = new Date(year, month, 0).getDate();
+  const today         = formatDateKey(new Date());
+
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const el = document.createElement('div'); el.className = 'cal-day other-month';
+    const n  = document.createElement('div'); n.className = 'day-num'; n.style.color = '#ccc'; n.textContent = daysInPrev - i;
+    el.appendChild(n); grid.appendChild(el);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateKey    = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayClasses = allClasses.filter(c => c.date === dateKey);
+    const hasClass   = dayClasses.length > 0;
+    const allFull    = hasClass && dayClasses.every(c => c.registeredCount >= c.capacity);
+    const el         = document.createElement('div');
+    el.className     = 'cal-day' + (dateKey === today ? ' today' : '') + (hasClass ? ' has-class' : '') + (selectedDate === dateKey ? ' selected' : '');
+    const num        = document.createElement('div'); num.className = 'day-num'; num.textContent = d; el.appendChild(num);
+    if (hasClass) {
+      const dots = document.createElement('div'); dots.className = 'day-dots';
+      dayClasses.forEach(c => { const dot = document.createElement('div'); dot.className = 'day-dot' + (c.registeredCount >= c.capacity ? ' full' : ''); dots.appendChild(dot); });
+      el.appendChild(dots);
+      el.addEventListener('click', () => { selectedDate = dateKey; renderCalendar(); showClassesForDate(dateKey); });
+    }
+    grid.appendChild(el);
+  }
+
+  const remaining = (firstDay + daysInMonth) % 7 === 0 ? 0 : 7 - ((firstDay + daysInMonth) % 7);
+  for (let i = 1; i <= remaining; i++) {
+    const el = document.createElement('div'); el.className = 'cal-day other-month';
+    const n  = document.createElement('div'); n.className = 'day-num'; n.style.color = '#ccc'; n.textContent = i;
+    el.appendChild(n); grid.appendChild(el);
+  }
+}
+
+function showClassesForDate(dateKey) {
+  const classes  = allClasses.filter(c => c.date === dateKey);
+  const panel    = document.getElementById('classList');
+  const title    = document.getElementById('panelTitle');
+  const subtitle = document.getElementById('panelSubtitle');
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  title.textContent    = `${dayNames[dt.getDay()]}, ${monthShort[m-1]} ${d}`;
+  subtitle.textContent = `${classes.length} class${classes.length !== 1 ? 'es' : ''} available`;
+  if (!classes.length) { panel.innerHTML = `<div class="empty-state"><div style="font-size:2rem">🗓️</div><p>No classes on this date.</p></div>`; return; }
+  panel.innerHTML = classes.map(cls => {
+    const spotsLeft = cls.capacity - cls.registeredCount;
+    const isFull    = spotsLeft <= 0;
+    const isFew     = !isFull && spotsLeft <= 3;
+    const badge     = isFull ? 'Full' : isFew ? `${spotsLeft} left` : `${spotsLeft} open`;
+    const badgeCls  = isFull ? 'full-badge' : isFew ? 'few' : 'open';
+    return `
+      <div class="class-item${isFull ? ' full' : ''}" ${isFull ? '' : `onclick="window.location.href='register.html?classId=${cls.id}'"` } style="${isFull ? '' : 'cursor:pointer'}">
+        <div class="class-item-top">
+          <div class="class-item-title">${esc(cls.title)}</div>
+          <span class="availability ${badgeCls}">${badge}</span>
+        </div>
+        <div class="class-item-meta">
+          <span>🕐 ${cls.time}</span><span>⏱ ${cls.duration} min</span><span>👤 ${esc(cls.instructor)}</span>
+        </div>
+        ${cls.description ? `<p style="font-size:0.8rem;color:var(--mid);margin-top:0.5rem">${esc(cls.description)}</p>` : ''}
+        ${!isFull ? `<div style="margin-top:0.75rem"><button class="btn btn-sage btn-sm" onclick="event.stopPropagation();window.location.href='register.html?classId=${cls.id}'">Book Now</button></div>` : '<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--light)">Class is fully booked</div>'}
+      </div>`;
+  }).join('');
+}
+
+document.getElementById('prevMonth').addEventListener('click', () => {
+  currentDate.setMonth(currentDate.getMonth() - 1); selectedDate = null; renderCalendar();
+  document.getElementById('panelTitle').textContent = 'Select a Date';
+  document.getElementById('panelSubtitle').textContent = 'Click a highlighted date to view classes';
+  document.getElementById('classList').innerHTML = `<div class="empty-state"><div style="font-size:2.5rem">📅</div><p>Select a date on the calendar to view available classes.</p></div>`;
+});
+document.getElementById('nextMonth').addEventListener('click', () => {
+  currentDate.setMonth(currentDate.getMonth() + 1); selectedDate = null; renderCalendar();
+  document.getElementById('panelTitle').textContent = 'Select a Date';
+  document.getElementById('panelSubtitle').textContent = 'Click a highlighted date to view classes';
+  document.getElementById('classList').innerHTML = `<div class="empty-state"><div style="font-size:2.5rem">📅</div><p>Select a date on the calendar to view available classes.</p></div>`;
+});
+
+document.getElementById('navToggle').addEventListener('click', function() {
+  this.classList.toggle('open');
+  document.getElementById('navLinks').classList.toggle('open');
+});
+
+loadMySchedule();
+</script>
+<script src="js/auth.js"></script>
+</body>
+</html>

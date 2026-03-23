@@ -7,6 +7,36 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .admin-card-header {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .admin-card-header h3 { flex: 1; margin: 0; }
+    .collapse-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--cream);
+      color: var(--mid);
+      font-size: 0.75rem;
+      transition: transform 0.22s ease, background 0.15s;
+      flex-shrink: 0;
+    }
+    .admin-card-header:hover .collapse-toggle { background: #ece8e2; color: var(--charcoal); }
+    .admin-card.collapsed .collapse-toggle { transform: rotate(-90deg); }
+    .admin-card-body {
+      overflow: hidden;
+      transition: none;
+    }
+    .admin-card.collapsed .admin-card-body { display: none; }
+  </style>
 </head>
 <body>
 
@@ -17,33 +47,14 @@
     <li><a href="index.html">Home</a></li>
     <li><a href="about.html">About Me</a></li>
     <li><a href="schedule.html">Schedule</a></li>
-    <li><a href="register.html">Book</a></li>
     <li><a href="waiver.html">Forms</a></li>
+    <li id="myScheduleNav" style="display:none"><a href="my-schedule.html">My Schedule</a></li>
     <li id="authNav"></li>
   </ul>
 </nav>
 
-<!-- Login Screen -->
-<div id="loginScreen">
-  <div class="page-hero" style="margin-bottom:0">
-    <p class="subtitle">Restricted Access</p>
-    <h1>Admin Panel</h1>
-    <p>Enter the admin password to manage classes and registrations.</p>
-  </div>
-  <div class="admin-login">
-    <div class="form-card">
-      <div id="loginAlert" style="display:none"></div>
-      <div class="form-group">
-        <label for="adminPassword">Admin Password</label>
-        <input type="password" id="adminPassword" placeholder="Enter password" onkeydown="if(event.key==='Enter')login()">
-      </div>
-      <button class="btn btn-primary form-submit" onclick="login()">Sign In</button>
-    </div>
-  </div>
-</div>
-
 <!-- Admin Dashboard -->
-<div id="adminDashboard" style="display:none">
+<div id="adminDashboard">
   <div class="page-hero">
     <p class="subtitle">Studio Management</p>
     <h1>Admin Dashboard</h1>
@@ -55,10 +66,31 @@
 
     <div class="admin-grid">
 
-      <!-- Add New Class -->
-      <div class="admin-card" style="grid-column: 1 / -1">
-        <div class="admin-card-header">
+      <!-- Class Roster (expanded by default, at top) -->
+      <div class="admin-card" style="grid-column: 1 / -1" id="card-roster">
+        <div class="admin-card-header" onclick="toggleCard('card-roster')">
+          <h3>📋 Class Roster</h3>
+          <span id="rosterCount" class="badge-count">0</span>
+          <span class="collapse-toggle">&#9660;</span>
+        </div>
+        <div class="admin-card-body">
+          <div class="form-group" style="margin-bottom:1.25rem">
+            <label for="rosterClassSelect">Select a class to view registrations</label>
+            <select id="rosterClassSelect" onchange="loadRoster()">
+              <option value="">— Choose a class —</option>
+            </select>
+          </div>
+          <div id="rosterList">
+            <div class="empty-state"><p>Select a class above to see who is registered.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add New Class (collapsed) -->
+      <div class="admin-card collapsed" style="grid-column: 1 / -1" id="card-add-class">
+        <div class="admin-card-header" onclick="toggleCard('card-add-class')">
           <h3>➕ Add New Class</h3>
+          <span class="collapse-toggle">&#9660;</span>
         </div>
         <div class="admin-card-body">
           <form id="addClassForm" onsubmit="addClass(event)">
@@ -109,25 +141,78 @@
         </div>
       </div>
 
-      <!-- Upcoming Classes -->
-      <div class="admin-card">
-        <div class="admin-card-header">
+      <!-- Upcoming Classes (collapsed) -->
+      <div class="admin-card collapsed" id="card-upcoming">
+        <div class="admin-card-header" onclick="toggleCard('card-upcoming')">
           <h3>Upcoming Classes</h3>
           <span id="classCount" class="badge-count">0</span>
+          <span class="collapse-toggle">&#9660;</span>
         </div>
         <div class="admin-card-body" id="upcomingList">
           <div class="empty-state"><p>No classes scheduled yet.</p></div>
         </div>
       </div>
 
-      <!-- Registrations -->
-      <div class="admin-card">
-        <div class="admin-card-header">
+      <!-- Registrations (collapsed) -->
+      <div class="admin-card collapsed" id="card-registrations">
+        <div class="admin-card-header" onclick="toggleCard('card-registrations')">
           <h3>Recent Registrations</h3>
           <span id="regCount" class="badge-count">0</span>
+          <span class="collapse-toggle">&#9660;</span>
         </div>
         <div class="admin-card-body" id="registrationsList">
           <div class="empty-state"><p>No registrations yet.</p></div>
+        </div>
+      </div>
+
+      <!-- Administrators (collapsed) -->
+      <div class="admin-card collapsed" style="grid-column: 1 / -1" id="card-admins">
+        <div class="admin-card-header" onclick="toggleCard('card-admins')">
+          <h3>🔑 Administrators</h3>
+          <span id="adminUserCount" class="badge-count">0</span>
+          <span class="collapse-toggle">&#9660;</span>
+        </div>
+        <div class="admin-card-body">
+          <div id="adminUsersAlert" style="display:none;margin-bottom:1rem"></div>
+          <div style="display:flex;gap:0.75rem;align-items:flex-end;margin-bottom:1.25rem;flex-wrap:wrap">
+            <div class="form-group" style="flex:1;min-width:220px;margin-bottom:0">
+              <label for="grantAdminEmail">Grant admin access by email</label>
+              <input type="email" id="grantAdminEmail" placeholder="user@example.com">
+            </div>
+            <button class="btn btn-primary" onclick="grantAdmin()" style="white-space:nowrap">Grant Access</button>
+          </div>
+          <div id="adminUsersList"><div class="empty-state"><p>Loading administrators…</p></div></div>
+        </div>
+      </div>
+
+      <!-- Settings (collapsed) -->
+      <div class="admin-card collapsed" style="grid-column: 1 / -1" id="card-settings">
+        <div class="admin-card-header" onclick="toggleCard('card-settings')">
+          <h3>⚙️ Settings</h3>
+          <span class="collapse-toggle">&#9660;</span>
+        </div>
+        <div class="admin-card-body">
+          <div id="settingsAlert" style="display:none;margin-bottom:1rem"></div>
+          <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap">
+            <div class="form-group" style="flex:1;min-width:260px;margin-bottom:0">
+              <label for="bookingNotifyEmail">Booking notification email</label>
+              <p style="font-size:0.82rem;color:var(--mid);margin:0 0 0.4rem">This address will receive an email each time a user books a class.</p>
+              <input type="email" id="bookingNotifyEmail" placeholder="e.g. amanda@redmaplemovement.ca">
+            </div>
+            <button class="btn btn-primary" onclick="saveSettings()" style="white-space:nowrap">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- All Users (collapsed) -->
+      <div class="admin-card collapsed" style="grid-column: 1 / -1" id="card-users">
+        <div class="admin-card-header" onclick="toggleCard('card-users')">
+          <h3>👥 All Users</h3>
+          <span id="allUsersCount" class="badge-count">0</span>
+          <span class="collapse-toggle">&#9660;</span>
+        </div>
+        <div class="admin-card-body" id="allUsersList">
+          <div class="empty-state"><p>Loading users…</p></div>
         </div>
       </div>
 
@@ -148,16 +233,22 @@
 </footer>
 
 <script>
-let adminPassword = '';
 let allClasses = [];
+
+function toggleCard(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
 
 // Set default date to today
 document.getElementById('newDate').value = new Date().toISOString().split('T')[0];
 
-function login() {
-  const pw = document.getElementById('adminPassword').value;
-  if (!pw) return;
-  adminPassword = pw;
+async function init() {
+  const res = await fetch('/auth/me');
+  const { user } = await res.json();
+  if (!user || !user.isAdmin) {
+    window.location.href = '/login.html';
+    return;
+  }
   loadDashboard();
 }
 
@@ -165,27 +256,25 @@ async function loadDashboard() {
   try {
     const [classRes, regRes] = await Promise.all([
       fetch('/api/classes'),
-      fetch(`/api/registrations?password=${encodeURIComponent(adminPassword)}`)
+      fetch('/api/registrations')
     ]);
 
     if (regRes.status === 401) {
-      const alert = document.getElementById('loginAlert');
-      alert.className = 'alert alert-error';
-      alert.textContent = 'Incorrect password. Please try again.';
-      alert.style.display = 'block';
+      window.location.href = '/login.html';
       return;
     }
 
     allClasses = await classRes.json();
     const registrations = await regRes.json();
-
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('adminDashboard').style.display = 'block';
+    window._allRegistrations = registrations;
 
     renderUpcomingClasses(allClasses, registrations);
     renderRegistrations(registrations);
+    populateRosterSelect(allClasses, registrations);
+    loadAdminUsers();
+    loadSettings();
   } catch (e) {
-    const alert = document.getElementById('loginAlert');
+    const alert = document.getElementById('dashboardAlert');
     alert.className = 'alert alert-error';
     alert.textContent = 'Could not connect to server.';
     alert.style.display = 'block';
@@ -265,7 +354,6 @@ async function addClass(e) {
   }
 
   const body = {
-    password: adminPassword,
     title,
     instructor: document.getElementById('newInstructor').value.trim() || 'Studio Instructor',
     date: document.getElementById('newDate').value,
@@ -315,6 +403,223 @@ document.getElementById('navToggle').addEventListener('click', function() {
   document.getElementById('navLinks').classList.toggle('open');
 });
 
+function renderAllUsers(users) {
+  const list  = document.getElementById('allUsersList');
+  const count = document.getElementById('allUsersCount');
+  if (!list) return;
+  count.textContent = users.length;
+  if (!users.length) { list.innerHTML = '<div class="empty-state"><p>No registered users yet.</p></div>'; return; }
+  list.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+      <thead>
+        <tr style="border-bottom:2px solid var(--red);text-align:left">
+          <th style="padding:8px 12px">Name</th>
+          <th style="padding:8px 12px">Email</th>
+          <th style="padding:8px 12px">Admin</th>
+          <th style="padding:8px 12px">Waiver</th>
+          <th style="padding:8px 12px">Signed</th>
+          <th style="padding:8px 12px">Confirmation</th>
+          <th style="padding:8px 12px">Joined</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${users.map(u => `
+          <tr style="border-bottom:1px solid #f0f0f0">
+            <td style="padding:10px 12px;font-weight:600">${u.first_name} ${u.last_name}</td>
+            <td style="padding:10px 12px">${u.email}</td>
+            <td style="padding:10px 12px;text-align:center">${u.is_admin ? '<span style="color:#2e7d32;font-weight:700">✓</span>' : '<span style="color:#ccc">—</span>'}</td>
+            <td style="padding:10px 12px">
+              ${u.waiver_id
+                ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 10px;border-radius:12px;font-size:0.78rem;font-weight:600">Signed</span>'
+                : '<span style="background:#fce4ec;color:#c62828;padding:2px 10px;border-radius:12px;font-size:0.78rem;font-weight:600">Not signed</span>'}
+            </td>
+            <td style="padding:10px 12px;color:var(--mid);white-space:nowrap">${u.waiver_signed_at ? new Date(u.waiver_signed_at).toLocaleDateString('en-CA') : '—'}</td>
+            <td style="padding:10px 12px">
+              ${u.waiver_id
+                ? `<a href="/api/admin/waiver/${u.waiver_id}" target="_blank" style="color:var(--red);font-size:0.82rem">View Waiver ↗</a>`
+                : '<span style="color:#ccc;font-size:0.82rem">—</span>'}
+            </td>
+            <td style="padding:10px 12px;color:var(--mid);white-space:nowrap">${new Date(u.created_at).toLocaleDateString('en-CA')}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+
+async function loadAdminUsers() {
+  try {
+    const res = await fetch('/api/admin/users');
+    if (!res.ok) return;
+    const users = await res.json();
+    const admins = users.filter(u => u.is_admin);
+    document.getElementById('adminUserCount').textContent = admins.length;
+    const list = document.getElementById('adminUsersList');
+    if (!admins.length) {
+      list.innerHTML = '<div class="empty-state"><p>No admin users yet. Grant access using the field above.</p></div>';
+      return;
+    }
+    list.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+        <thead>
+          <tr style="border-bottom:2px solid var(--red);text-align:left">
+            <th style="padding:8px 12px">Name</th>
+            <th style="padding:8px 12px">Email</th>
+            <th style="padding:8px 12px">Since</th>
+            <th style="padding:8px 12px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${admins.map(u => `
+            <tr style="border-bottom:1px solid #f0f0f0">
+              <td style="padding:10px 12px;font-weight:600">${u.first_name} ${u.last_name}</td>
+              <td style="padding:10px 12px">${u.email}</td>
+              <td style="padding:10px 12px;color:var(--mid)">${new Date(u.created_at).toLocaleDateString('en-CA')}</td>
+              <td style="padding:10px 12px;text-align:right">
+                <button class="btn-danger" style="font-size:0.78rem;padding:0.3rem 0.75rem"
+                  onclick="revokeAdmin('${u.id}', '${u.first_name} ${u.last_name}')">Revoke</button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+    // Also refresh the all-users table if it exists
+    renderAllUsers(users);
+  } catch (e) { console.error(e); }
+}
+
+async function grantAdmin() {
+  const email = document.getElementById('grantAdminEmail').value.trim();
+  const alert = document.getElementById('adminUsersAlert');
+  if (!email) { alert.className = 'alert alert-error'; alert.textContent = 'Please enter an email address.'; alert.style.display = 'block'; return; }
+  const res = await fetch('/api/admin/users/grant', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    alert.className = 'alert alert-success';
+    alert.textContent = `Admin access granted to ${data.user.email}.`;
+    document.getElementById('grantAdminEmail').value = '';
+    loadAdminUsers();
+  } else {
+    alert.className = 'alert alert-error';
+    alert.textContent = data.error || 'Failed to grant access.';
+  }
+  alert.style.display = 'block';
+}
+
+async function revokeAdmin(userId, name) {
+  if (!confirm(`Revoke admin access for ${name}?`)) return;
+  const alert = document.getElementById('adminUsersAlert');
+  const res = await fetch(`/api/admin/users/${userId}/admin`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  if (res.ok) {
+    alert.className = 'alert alert-success';
+    alert.textContent = `Admin access revoked for ${name}.`;
+    loadAdminUsers();
+  } else {
+    const data = await res.json();
+    alert.className = 'alert alert-error';
+    alert.textContent = data.error || 'Failed to revoke access.';
+  }
+  alert.style.display = 'block';
+}
+
+function populateRosterSelect(classes, registrations) {
+  const select = document.getElementById('rosterClassSelect');
+  const current = select.value;
+  const now = new Date();
+  const sorted = [...classes]
+    .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+
+  select.innerHTML = '<option value="">— Choose a class —</option>';
+  sorted.forEach(c => {
+    const regCount = registrations.filter(r => r.classId === c.id).length;
+    const isPast = new Date(`${c.date}T${c.time}`) < now;
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = `${isPast ? '✓ ' : ''}${formatDate(c.date)} · ${c.time} · ${c.title} (${regCount}/${c.capacity})`;
+    if (isPast) opt.style.color = '#999';
+    select.appendChild(opt);
+  });
+
+  if (current) { select.value = current; loadRoster(); }
+}
+
+function loadRoster() {
+  const classId = document.getElementById('rosterClassSelect').value;
+  const list    = document.getElementById('rosterList');
+  const count   = document.getElementById('rosterCount');
+
+  if (!classId) {
+    count.textContent = '0';
+    list.innerHTML = '<div class="empty-state"><p>Select a class above to see who is registered.</p></div>';
+    return;
+  }
+
+  const cls  = allClasses.find(c => c.id === classId);
+  const regs = (window._allRegistrations || []).filter(r => r.classId === classId);
+  count.textContent = regs.length;
+
+  if (!regs.length) {
+    list.innerHTML = `<div class="empty-state"><p>No registrations yet for <strong>${cls ? cls.title : 'this class'}</strong>.</p></div>`;
+    return;
+  }
+
+  list.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+      <thead>
+        <tr style="border-bottom:2px solid var(--red);text-align:left">
+          <th style="padding:8px 12px">Name</th>
+          <th style="padding:8px 12px">Email</th>
+          <th style="padding:8px 12px">Phone</th>
+          <th style="padding:8px 12px">Registered</th>
+          <th style="padding:8px 12px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${regs.map(r => `
+          <tr style="border-bottom:1px solid #f0f0f0" id="reg-row-${r.id}">
+            <td style="padding:10px 12px;font-weight:600">${r.firstName} ${r.lastName}</td>
+            <td style="padding:10px 12px"><a href="mailto:${r.email}" style="color:var(--red)">${r.email}</a></td>
+            <td style="padding:10px 12px;color:var(--mid)">${r.phone || '—'}</td>
+            <td style="padding:10px 12px;color:var(--mid);white-space:nowrap">${new Date(r.registeredAt).toLocaleDateString('en-CA')}</td>
+            <td style="padding:10px 12px;text-align:right">
+              <button class="btn-danger" style="font-size:0.78rem;padding:0.3rem 0.75rem"
+                onclick="removeRegistration('${r.id}', '${r.firstName} ${r.lastName}')">Remove</button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <p style="margin-top:0.75rem;font-size:0.8rem;color:var(--mid)">${regs.length} of ${cls ? cls.capacity : '?'} spots filled · Removing a registrant will send them an email notification.</p>`;
+}
+
+async function removeRegistration(regId, name) {
+  if (!confirm(`Remove ${name} from this class? They will be sent a cancellation email.`)) return;
+  const alert = document.getElementById('dashboardAlert');
+
+  const res = await fetch(`/api/admin/registrations/${regId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+
+  if (res.ok) {
+    alert.className = 'alert alert-success';
+    alert.textContent = `${name} has been removed and notified by email.`;
+    alert.style.display = 'block';
+    loadDashboard();
+  } else {
+    const data = await res.json();
+    alert.className = 'alert alert-error';
+    alert.textContent = data.error || 'Failed to remove registration.';
+    alert.style.display = 'block';
+  }
+}
+
 async function deleteClass(classId) {
   if (!confirm('Are you sure you want to delete this class? All registrations for it will also be removed.')) return;
 
@@ -323,7 +628,7 @@ async function deleteClass(classId) {
   const res = await fetch(`/api/classes/${classId}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: adminPassword })
+    body: JSON.stringify({})
   });
 
   if (res.ok) {
@@ -338,6 +643,44 @@ async function deleteClass(classId) {
     alert.style.display = 'block';
   }
 }
+
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/admin/settings');
+    if (!res.ok) return;
+    const settings = await res.json();
+    if (settings.booking_notify_email) {
+      document.getElementById('bookingNotifyEmail').value = settings.booking_notify_email;
+    }
+  } catch (e) { console.error(e); }
+}
+
+async function saveSettings() {
+  const email = document.getElementById('bookingNotifyEmail').value.trim();
+  const alert = document.getElementById('settingsAlert');
+  try {
+    const res = await fetch('/api/admin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'booking_notify_email', value: email })
+    });
+    if (res.ok) {
+      alert.className = 'alert alert-success';
+      alert.textContent = email ? `Booking notifications will be sent to ${email}.` : 'Notification email cleared.';
+    } else {
+      const data = await res.json();
+      alert.className = 'alert alert-error';
+      alert.textContent = data.error || 'Failed to save setting.';
+    }
+  } catch {
+    alert.className = 'alert alert-error';
+    alert.textContent = 'Network error. Please try again.';
+  }
+  alert.style.display = 'block';
+  setTimeout(() => { alert.style.display = 'none'; }, 4000);
+}
+
+document.addEventListener('DOMContentLoaded', init);
 </script>
 <script src="js/auth.js"></script>
 </body>
