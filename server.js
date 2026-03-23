@@ -25,6 +25,11 @@ function cancelToken(registrationId) {
     .update(registrationId).digest('hex');
 }
 
+function paymentActionToken(registrationId, action) {
+  return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'dev-secret')
+    .update(`payment-${action}-${registrationId}`).digest('hex');
+}
+
 function formatClassTime(time) {
   const [h, m] = time.split(':').map(Number);
   const ampm = h >= 12 ? 'PM' : 'AM';
@@ -183,6 +188,110 @@ async function getSetting(key) {
   } catch { return null; }
 }
 
+async function sendAdminPaymentAlertEmail({ notifyEmail, unpaidList }) {
+  if (!notifyEmail || !process.env.RESEND_API_KEY) return;
+  const rows = unpaidList.map(({ reg, cls }) => {
+    const confirmUrl = `${APP_URL}/api/admin/payment-action/${reg.id}/confirm?token=${paymentActionToken(reg.id, 'confirm')}`;
+    const releaseUrl = `${APP_URL}/api/admin/payment-action/${reg.id}/release?token=${paymentActionToken(reg.id, 'release')}`;
+    return `
+      <div style="border:1px solid #e0e0e0;border-radius:6px;padding:20px;margin-bottom:20px">
+        <p style="margin:0 0 4px;font-size:16px;font-weight:bold">${reg.firstName} ${reg.lastName}</p>
+        <p style="margin:0 0 2px;font-size:13px;color:#555">${reg.email} &nbsp;·&nbsp; ${reg.phone || '—'}</p>
+        <p style="margin:4px 0 12px;font-size:13px">
+          <strong>${cls ? cls.title : 'Unknown class'}</strong>
+          ${cls ? ` — ${formatClassDate(cls.date)} at ${formatClassTime(cls.time)}` : ''}
+        </p>
+        <p style="margin:0 0 12px;font-size:12px;color:#888">Registered: ${new Date(reg.registeredAt).toLocaleString('en-CA')}</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <a href="${confirmUrl}" style="display:inline-block;background:#2d6a2d;color:#fff;padding:10px 22px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:14px">✅ Payment Received</a>
+          <a href="${releaseUrl}" style="display:inline-block;background:#820000;color:#fff;padding:10px 22px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:14px">❌ No Payment — Remove</a>
+        </div>
+      </div>`;
+  }).join('');
+
+  await getResend().emails.send({
+    from: FROM_ADDRESS,
+    to: notifyEmail,
+    subject: `Payment Alert: ${unpaidList.length} unpaid booking${unpaidList.length > 1 ? 's' : ''} require your attention`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;color:#333">
+        <div style="background:#820000;padding:24px;text-align:center">
+          <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
+        </div>
+        <div style="padding:32px">
+          <h2 style="color:#820000;margin-top:0">Payment Required — Action Needed</h2>
+          <p>The following ${unpaidList.length > 1 ? `<strong>${unpaidList.length} bookings have</strong>` : 'booking has'} been pending for over 1 hour without recorded payment. Please confirm or remove each registration.</p>
+          ${rows}
+          <p style="font-size:12px;color:#999;margin-top:24px">Each button above is a one-click action — no login required. Clicking "Payment Received" marks the booking as paid and sends a confirmation to the attendee. Clicking "No Payment — Remove" cancels the booking and notifies the attendee.</p>
+        </div>
+        <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
+          Red Maple Movement &mdash; <a href="${APP_URL}/admin.html" style="color:#820000">Admin Dashboard</a>
+        </div>
+      </div>`
+  });
+}
+
+async function sendPaymentConfirmedEmail({ to, firstName, cls }) {
+  if (!process.env.RESEND_API_KEY) return;
+  await getResend().emails.send({
+    from: FROM_ADDRESS,
+    to,
+    subject: `Payment Confirmed — See you in ${cls.title}!`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
+        <div style="background:#820000;padding:24px;text-align:center">
+          <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
+        </div>
+        <div style="padding:32px">
+          <h2 style="color:#2d6a2d">Payment Received — You're all set, ${firstName}!</h2>
+          <p>We've received your payment and your spot is officially confirmed. We can't wait to see you on the mat!</p>
+          <div style="background:#f9f9f9;border-left:4px solid #820000;padding:16px;margin:24px 0;border-radius:4px">
+            <p style="margin:4px 0"><strong>Class:</strong> ${cls.title}</p>
+            <p style="margin:4px 0"><strong>Date:</strong> ${formatClassDate(cls.date)}</p>
+            <p style="margin:4px 0"><strong>Time:</strong> ${formatClassTime(cls.time)}</p>
+            <p style="margin:4px 0"><strong>Instructor:</strong> ${cls.instructor}</p>
+            <p style="margin:4px 0"><strong>Duration:</strong> ${cls.duration} minutes</p>
+          </div>
+          <p>Need to cancel? Please let us know more than 24 hours before class for a full refund. See our <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.</p>
+          <a href="${APP_URL}/my-schedule.html" style="display:inline-block;background:#820000;color:#fff;padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:bold">View My Schedule</a>
+        </div>
+        <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
+          Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#820000">${APP_URL}</a>
+        </div>
+      </div>`
+  });
+}
+
+async function sendPaymentReleasedEmail({ to, firstName, cls }) {
+  if (!process.env.RESEND_API_KEY) return;
+  await getResend().emails.send({
+    from: FROM_ADDRESS,
+    to,
+    subject: `Your spot in ${cls.title} — Payment not received`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
+        <div style="background:#820000;padding:24px;text-align:center">
+          <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
+        </div>
+        <div style="padding:32px">
+          <h2 style="color:#820000">Oops — Looks Like We Missed Your Payment, ${firstName}</h2>
+          <p>We weren't able to confirm payment for your reserved spot in <strong>${cls.title}</strong>, so we've released it back to the waitlist.</p>
+          <div style="background:#f9f9f9;border-left:4px solid #820000;padding:16px;margin:24px 0;border-radius:4px">
+            <p style="margin:4px 0"><strong>Class:</strong> ${cls.title}</p>
+            <p style="margin:4px 0"><strong>Date:</strong> ${formatClassDate(cls.date)}</p>
+            <p style="margin:4px 0"><strong>Time:</strong> ${formatClassTime(cls.time)}</p>
+          </div>
+          <p>If you'd still like to join us, we'd love to have you! Simply book your spot again and complete your e-Transfer payment right away to lock it in.</p>
+          <a href="${APP_URL}/register.html" style="display:inline-block;background:#820000;color:#fff;padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:bold">Book Again</a>
+          <p style="margin-top:24px;font-size:0.85rem;color:#666">If you think this is a mistake or already sent payment, please reply to this email or contact us at <a href="mailto:amanda@redmaplemovement.ca" style="color:#820000">amanda@redmaplemovement.ca</a>.</p>
+        </div>
+        <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
+          Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#820000">${APP_URL}</a>
+        </div>
+      </div>`
+  });
+}
+
 async function sendNewBookingNotification({ notifyEmail, registrant, cls }) {
   if (!notifyEmail || !process.env.RESEND_API_KEY) return;
   await getResend().emails.send({
@@ -329,6 +438,11 @@ async function initDB() {
   // Add payment_status column to existing registrations tables
   await pool.query(`
     ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'pending';
+  `);
+
+  // Add payment_alert_sent column — tracks whether admin has been notified for this unpaid registration
+  await pool.query(`
+    ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_alert_sent BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 
   // Seed sample data if empty
@@ -831,45 +945,107 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
-  // Cron endpoint — runs every 30 min to release unpaid spots after 1 hour
+  // Cron endpoint — runs every 30 min; alerts admin about unpaid registrations after 1 hour
   app.get('/api/cron/release-unpaid', async (req, res) => {
     if (req.headers['authorization'] !== `Bearer ${process.env.CRON_SECRET}`) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     try {
-      const { rows } = await pool.query(`
-        DELETE FROM registrations
-        WHERE payment_status = 'pending'
-          AND "registeredAt"::timestamptz < NOW() - INTERVAL '1 hour'
-        RETURNING id, "firstName", "lastName", email, "classId"
+      // Find pending registrations older than 1 hour that haven't been flagged to admin yet
+      const { rows: unpaid } = await pool.query(`
+        SELECT r.id, r."firstName", r."lastName", r.email, r.phone, r."classId", r."registeredAt",
+               c.title, c.date, c.time, c.instructor, c.duration
+        FROM registrations r
+        LEFT JOIN classes c ON c.id = r."classId"
+        WHERE r.payment_status = 'pending'
+          AND r.payment_alert_sent = FALSE
+          AND r."registeredAt"::timestamptz < NOW() - INTERVAL '1 hour'
       `);
-      for (const reg of rows) {
-        if (process.env.RESEND_API_KEY) {
-          getResend().emails.send({
-            from: FROM_ADDRESS,
-            to: reg.email,
-            subject: 'Your spot at Red Maple Movement has been released',
-            html: `
-              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
-                <div style="background:#820000;padding:24px;text-align:center">
-                  <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
-                </div>
-                <div style="padding:32px">
-                  <h2 style="color:#820000">Spot Released — ${reg.firstName}</h2>
-                  <p>Your reserved spot has been released as payment was not received within 1 hour of booking.</p>
-                  <p>Your spot is now available for others to book. If you'd still like to join the class, please <a href="${APP_URL}/register.html" style="color:#820000">book again</a> and complete payment promptly.</p>
-                  <p>Questions? Reply to this email or reach us at <a href="mailto:amanda@redmaplemovement.ca" style="color:#820000">amanda@redmaplemovement.ca</a>.</p>
-                </div>
-                <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
-                  Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#820000">${APP_URL}</a>
-                </div>
-              </div>`
-          }).catch(e => console.error('Release email error:', e.message));
-        }
-      }
-      res.json({ success: true, released: rows.length });
+
+      if (unpaid.length === 0) return res.json({ success: true, alerted: 0 });
+
+      // Mark all as alerted so we don't re-send
+      const ids = unpaid.map(r => r.id);
+      await pool.query(
+        `UPDATE registrations SET payment_alert_sent = TRUE WHERE id = ANY($1)`,
+        [ids]
+      );
+
+      // Send admin digest email
+      const notifyEmail = await getSetting('booking_notify_email');
+      const unpaidList = unpaid.map(row => ({
+        reg: { id: row.id, firstName: row.firstName, lastName: row.lastName, email: row.email, phone: row.phone, registeredAt: row.registeredAt },
+        cls: row.title ? { title: row.title, date: row.date, time: row.time, instructor: row.instructor, duration: row.duration } : null
+      }));
+      await sendAdminPaymentAlertEmail({ notifyEmail, unpaidList })
+        .catch(e => console.error('Admin payment alert error:', e.message));
+
+      res.json({ success: true, alerted: unpaid.length });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
+
+  // Admin payment action — confirm payment received
+  app.get('/api/admin/payment-action/:id/confirm', async (req, res) => {
+    const { id } = req.params;
+    const { token } = req.query;
+    if (token !== paymentActionToken(id, 'confirm')) {
+      return res.status(403).send(actionPage('Invalid or expired link.', false));
+    }
+    try {
+      const { rows } = await pool.query(
+        `UPDATE registrations SET payment_status = 'paid'
+         WHERE id = $1 AND payment_status != 'paid'
+         RETURNING "firstName", "lastName", email, "classId"`,
+        [id]
+      );
+      if (rows.length === 0) return res.send(actionPage('This booking has already been processed.', true));
+      const reg = rows[0];
+      const { rows: clsRows } = await pool.query('SELECT * FROM classes WHERE id = $1', [reg.classId]);
+      const cls = clsRows[0];
+      sendPaymentConfirmedEmail({ to: reg.email, firstName: reg.firstName, cls })
+        .catch(e => console.error('Payment confirmed email error:', e.message));
+      res.send(actionPage(`✅ Payment confirmed for ${reg.firstName} ${reg.lastName}. A confirmation email has been sent to ${reg.email}.`, true));
+    } catch (e) { console.error(e); res.status(500).send(actionPage('Server error. Please try again.', false)); }
+  });
+
+  // Admin payment action — no payment received, remove from class
+  app.get('/api/admin/payment-action/:id/release', async (req, res) => {
+    const { id } = req.params;
+    const { token } = req.query;
+    if (token !== paymentActionToken(id, 'release')) {
+      return res.status(403).send(actionPage('Invalid or expired link.', false));
+    }
+    try {
+      const { rows } = await pool.query(
+        `DELETE FROM registrations WHERE id = $1 AND payment_status = 'pending'
+         RETURNING "firstName", "lastName", email, "classId"`,
+        [id]
+      );
+      if (rows.length === 0) return res.send(actionPage('This booking has already been processed or was already paid.', true));
+      const reg = rows[0];
+      const { rows: clsRows } = await pool.query('SELECT * FROM classes WHERE id = $1', [reg.classId]);
+      const cls = clsRows[0];
+      if (cls) {
+        sendPaymentReleasedEmail({ to: reg.email, firstName: reg.firstName, cls })
+          .catch(e => console.error('Payment released email error:', e.message));
+      }
+      res.send(actionPage(`❌ Booking removed for ${reg.firstName} ${reg.lastName}. A notification email has been sent to ${reg.email}.`, true));
+    } catch (e) { console.error(e); res.status(500).send(actionPage('Server error. Please try again.', false)); }
+  });
+
+  function actionPage(message, success) {
+    const color = success ? '#2d6a2d' : '#820000';
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Red Maple Movement — Admin Action</title>
+      <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5}
+      .card{background:#fff;border-radius:8px;padding:40px;max-width:480px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.1)}
+      h2{color:${color};margin-top:0}p{color:#555;line-height:1.6}
+      a{display:inline-block;margin-top:20px;background:#820000;color:#fff;padding:10px 24px;border-radius:4px;text-decoration:none;font-weight:bold}</style>
+    </head><body><div class="card">
+      <h2>Red Maple Movement</h2>
+      <p>${message}</p>
+      <a href="/admin.html">Go to Admin Dashboard</a>
+    </div></body></html>`;
+  }
 
   // Waiver routes
   app.post('/api/waiver', async (req, res) => {
