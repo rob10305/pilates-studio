@@ -318,12 +318,12 @@ function showSuccess(firstName, lastName, classId) {
       <h3>Spot Reserved, ${firstName}!</h3>
       <p>Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is held — complete payment to confirm.</p>
 
-      <div style="background:#fff8e1;border:1.5px solid #f5c200;border-radius:10px;padding:1.25rem 1.5rem;margin:1.5rem 0;text-align:left">
-        <p style="font-weight:700;font-size:1rem;margin-bottom:0.5rem">💳 Complete Your Payment</p>
+      <div style="background:#fff3f3;border:2px solid #820000;border-radius:10px;padding:1.25rem 1.5rem;margin:1.5rem 0;text-align:left">
+        <p style="font-weight:800;font-size:1.05rem;margin-bottom:0.4rem;color:#820000">⚠️ PAY NOW — You have 1 hour</p>
+        <p style="font-size:0.88rem;color:#5a0000;margin-bottom:0.75rem">Your spot is reserved for <strong>1 hour only</strong>. If payment is not received, your spot will be automatically released.</p>
         <p style="font-size:0.9rem;margin-bottom:0.4rem">Send <strong>$28 CAD</strong> via <strong>Interac e-Transfer</strong> to:</p>
-        <p style="font-size:1.1rem;font-weight:700;color:#820000;margin-bottom:0.4rem">amanda@redmaplemovement.ca</p>
-        <p style="font-size:0.85rem;color:#5a4000;margin-bottom:0.4rem">Message: <em>${firstName} ${lastName}${cls ? ' — ' + cls.title + ' ' + clsDate : ''}</em></p>
-        <p style="font-size:0.8rem;color:#888;margin-top:0.75rem">Your spot is held for 24 hours pending payment. Cancellations more than 24 hours before class start are fully refundable. <a href="cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
+        <p style="font-size:1.1rem;font-weight:700;color:#820000;margin-bottom:0.75rem">amanda@redmaplemovement.ca</p>
+        <p style="font-size:0.8rem;color:#888;margin-top:0.5rem">Cancellations more than 24 hours before class start are fully refundable. <a href="cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
       </div>
 
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">

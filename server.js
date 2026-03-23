@@ -61,12 +61,12 @@ async function sendConfirmationEmail({ to, firstName, lastName, cls, registratio
             <p style="margin:4px 0"><strong>Instructor:</strong> ${cls.instructor}</p>
             <p style="margin:4px 0"><strong>Duration:</strong> ${cls.duration} minutes</p>
           </div>
-          <div style="background:#fff8e1;border:1.5px solid #f5c200;padding:20px;margin:24px 0;border-radius:6px">
-            <h3 style="margin:0 0 12px;color:#5a4000">💳 Payment Required — $28 CAD</h3>
+          <div style="background:#fff3f3;border:2px solid #820000;padding:20px;margin:24px 0;border-radius:6px">
+            <h3 style="margin:0 0 8px;color:#820000">⚠️ PAY NOW — You have 1 hour</h3>
+            <p style="margin:0 0 12px;font-size:13px;color:#5a0000">Your spot is reserved for <strong>1 hour only</strong>. If payment is not received within 1 hour, your spot will be automatically released.</p>
             <p style="margin:4px 0">Please send <strong>$28</strong> via <strong>Interac e-Transfer</strong> to:</p>
             <p style="margin:10px 0;font-size:18px;font-weight:bold">amanda@redmaplemovement.ca</p>
-            <p style="margin:4px 0">Message / note: <em>${firstName} ${lastName} — ${cls.title} ${formatClassDate(cls.date)}</em></p>
-            <p style="margin:12px 0 0;font-size:12px;color:#666">Your spot is held pending payment. Cancellations made more than 24 hours before class start are fully refundable. See our <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.</p>
+            <p style="margin:12px 0 0;font-size:12px;color:#666">Cancellations made more than 24 hours before class start are fully refundable. See our <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.</p>
           </div>
           <p>We'll send you a reminder 24 hours before your class.</p>
           <p>Need to cancel? <a href="${cancelUrl}" style="color:#820000">Click here to cancel your booking</a>.</p>
@@ -828,6 +828,46 @@ async function createApp() {
         sent++;
       }
       res.json({ success: true, remindersSent: sent, date: tomorrowStr });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Cron endpoint — runs every 30 min to release unpaid spots after 1 hour
+  app.get('/api/cron/release-unpaid', async (req, res) => {
+    if (req.headers['authorization'] !== `Bearer ${process.env.CRON_SECRET}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const { rows } = await pool.query(`
+        DELETE FROM registrations
+        WHERE payment_status = 'pending'
+          AND "registeredAt"::timestamptz < NOW() - INTERVAL '1 hour'
+        RETURNING id, "firstName", "lastName", email, "classId"
+      `);
+      for (const reg of rows) {
+        if (process.env.RESEND_API_KEY) {
+          getResend().emails.send({
+            from: FROM_ADDRESS,
+            to: reg.email,
+            subject: 'Your spot at Red Maple Movement has been released',
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
+                <div style="background:#820000;padding:24px;text-align:center">
+                  <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
+                </div>
+                <div style="padding:32px">
+                  <h2 style="color:#820000">Spot Released — ${reg.firstName}</h2>
+                  <p>Your reserved spot has been released as payment was not received within 1 hour of booking.</p>
+                  <p>Your spot is now available for others to book. If you'd still like to join the class, please <a href="${APP_URL}/register.html" style="color:#820000">book again</a> and complete payment promptly.</p>
+                  <p>Questions? Reply to this email or reach us at <a href="mailto:amanda@redmaplemovement.ca" style="color:#820000">amanda@redmaplemovement.ca</a>.</p>
+                </div>
+                <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
+                  Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#820000">${APP_URL}</a>
+                </div>
+              </div>`
+          }).catch(e => console.error('Release email error:', e.message));
+        }
+      }
+      res.json({ success: true, released: rows.length });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
