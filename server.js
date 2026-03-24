@@ -663,6 +663,7 @@ async function createApp() {
 
   app.get('/auth/google', (req, res, next) => {
     if (!process.env.GOOGLE_CLIENT_ID) return res.redirect('/login.html?error=google-not-configured');
+    if (req.query.returnTo) req.session.authReturnTo = req.query.returnTo;
     passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
   });
   app.get('/auth/google/callback', (req, res, next) => {
@@ -672,7 +673,9 @@ async function createApp() {
       if (!user) { console.error('Google auth: no user returned'); return res.redirect('/login.html?error=google'); }
       req.login(user, (loginErr) => {
         if (loginErr) { console.error('Google login error:', loginErr.message || loginErr); return res.redirect('/login.html?error=google'); }
-        return res.redirect('/');
+        const returnTo = req.session.authReturnTo || '/';
+        delete req.session.authReturnTo;
+        return res.redirect(returnTo.startsWith('http') ? returnTo : '/' + returnTo);
       });
     })(req, res, next);
   });
