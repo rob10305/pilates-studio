@@ -445,25 +445,12 @@ async function initDB() {
     ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_alert_sent BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 
-  // Seed sample data if empty
-  const { rows } = await pool.query('SELECT COUNT(*) AS n FROM classes');
-  if (parseInt(rows[0].n) === 0) {
-    const insert = `INSERT INTO classes (id,title,instructor,date,time,duration,capacity,description) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`;
-    const seed = [
-      ['1011','Mat Pilates','Amanda','2026-04-09','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
-      ['1012','Mat Pilates','Amanda','2026-04-16','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
-      ['1013','Mat Pilates','Amanda','2026-04-23','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
-      ['1014','Mat Pilates','Amanda','2026-04-30','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ];
-    for (const row of seed) await pool.query(insert, row);
-    console.log('Database seeded with sample classes.');
-  }
+  // Clean up: remove all classes except our official April schedule
+  await pool.query(`DELETE FROM classes WHERE id NOT IN ('1010','1011','1012','1013','1014')`);
 
-  // Remove old March 31 class if it exists
-  await pool.query(`DELETE FROM classes WHERE id = '1000'`);
-
-  // Ensure April classes exist (even if DB was already seeded)
+  // Ensure April classes exist (upsert)
   const aprilClasses = [
+    ['1010','Mat Pilates','Amanda','2026-04-02','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1011','Mat Pilates','Amanda','2026-04-09','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1012','Mat Pilates','Amanda','2026-04-16','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1013','Mat Pilates','Amanda','2026-04-23','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
@@ -473,8 +460,21 @@ async function initDB() {
     await pool.query(`
       INSERT INTO classes (id,title,instructor,date,time,duration,capacity,description)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-      ON CONFLICT (id) DO NOTHING
+      ON CONFLICT (id) DO UPDATE SET title=$2, instructor=$3, date=$4, time=$5, duration=$6, capacity=$7, description=$8
     `, row);
+  }
+
+  // Make April 2 class appear full by inserting 12 placeholder registrations
+  const { rows: apr2Regs } = await pool.query(`SELECT COUNT(*)::int AS n FROM registrations WHERE "classId" = '1010'`);
+  const apr2Count = apr2Regs[0].n;
+  if (apr2Count < 12) {
+    for (let i = apr2Count + 1; i <= 12; i++) {
+      await pool.query(
+        `INSERT INTO registrations (id, "classId", "firstName", "lastName", email, phone) VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (id) DO NOTHING`,
+        [`apr2-placeholder-${i}`, '1010', 'Reserved', 'Spot', `reserved${i}@placeholder.local`, '']
+      );
+    }
   }
 }
 
