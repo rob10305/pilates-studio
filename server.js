@@ -865,6 +865,21 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
+  // Admin: delete a user account and their registrations
+  app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
+    const userId = req.params.id;
+    try {
+      // Prevent deleting yourself
+      if (req.user && String(req.user.id) === String(userId)) {
+        return res.status(400).json({ error: 'You cannot delete your own account.' });
+      }
+      await pool.query('DELETE FROM registrations WHERE user_id = $1', [userId]);
+      const { rowCount } = await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+      if (rowCount === 0) return res.status(404).json({ error: 'User not found.' });
+      res.json({ success: true });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
   // Admin: mark a registration as paid
   app.post('/api/admin/registrations/:id/mark-paid', requireAdmin, async (req, res) => {
     try {
