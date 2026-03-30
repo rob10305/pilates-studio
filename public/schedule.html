@@ -224,7 +224,7 @@ function showClassesForDate(dateKey) {
   const [y, m, d] = dateKey.split('-');
   const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
   const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   title.textContent = `${dayNames[dateObj.getDay()]}, ${monthNames[parseInt(m)-1]} ${parseInt(d)}`;
   subtitle.textContent = `${classes.length} class${classes.length !== 1 ? 'es' : ''} available`;
 
