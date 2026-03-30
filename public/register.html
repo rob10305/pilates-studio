@@ -180,7 +180,7 @@ async function loadClasses() {
   const upcoming = allClasses
     .filter(c => {
       const d = new Date(`${c.date}T${c.time}`);
-      return d >= now && c.date === '2026-03-31';
+      return d >= now && ['2026-04-09','2026-04-16','2026-04-23','2026-04-30'].includes(c.date);
     })
     .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
 

@@ -450,28 +450,32 @@ async function initDB() {
   if (parseInt(rows[0].n) === 0) {
     const insert = `INSERT INTO classes (id,title,instructor,date,time,duration,capacity,description) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`;
     const seed = [
-      ['1000','Mat Pilates','Amanda','2026-03-31','11:00',60,12,'Classic mat-based Pilates for full-body conditioning.'],
-      ['1001','Foundations Pilates','Sophie Andrews','2026-04-07','09:00',45,10,'Perfect for beginners — build core strength and learn the fundamentals.'],
-      ['1002','Mat Pilates','Claire Holt','2026-04-07','11:00',60,12,'Classic mat-based Pilates for full-body conditioning.'],
-      ['1003','Power Pilates','James Reid','2026-04-08','07:30',50,8,'High-energy workout for those ready to level up.'],
-      ['1004','Pilates & Flow','Sophie Andrews','2026-04-09','10:00',60,10,'A mindful blend of Pilates and gentle yoga flow.'],
-      ['1005','Reformer Pilates','Claire Holt','2026-04-10','09:30',55,6,'Spring-loaded resistance on the iconic reformer machine.'],
-      ['1006','Prenatal Pilates','Emma Walsh','2026-04-11','10:30',45,8,'Gentle and safe Pilates for expectant mothers.'],
-      ['1007','Mat Pilates','James Reid','2026-04-14','18:00',60,12,'Unwind after your workday with an evening mat class.'],
-      ['1008','Power Pilates','Claire Holt','2026-04-16','07:00',50,8,'Start your Wednesday strong.'],
-      ['1009','Pilates & Flow','Emma Walsh','2026-04-18','11:00',60,10,'End your week with balance and calm.'],
-      ['1010','Foundations Pilates','Sophie Andrews','2026-04-21','09:00',45,10,'Perfect for beginners.'],
+      ['1011','Mat Pilates','Amanda','2026-04-09','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
+      ['1012','Mat Pilates','Amanda','2026-04-16','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
+      ['1013','Mat Pilates','Amanda','2026-04-23','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
+      ['1014','Mat Pilates','Amanda','2026-04-30','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
     ];
     for (const row of seed) await pool.query(insert, row);
     console.log('Database seeded with sample classes.');
   }
 
-  // Ensure March 31 class exists (even if DB was already seeded)
-  await pool.query(`
-    INSERT INTO classes (id,title,instructor,date,time,duration,capacity,description)
-    VALUES ('1000','Mat Pilates','Amanda','2026-03-31','11:00',60,12,'Classic mat-based Pilates for full-body conditioning.')
-    ON CONFLICT (id) DO NOTHING
-  `);
+  // Remove old March 31 class if it exists
+  await pool.query(`DELETE FROM classes WHERE id = '1000'`);
+
+  // Ensure April classes exist (even if DB was already seeded)
+  const aprilClasses = [
+    ['1011','Mat Pilates','Amanda','2026-04-09','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1012','Mat Pilates','Amanda','2026-04-16','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1013','Mat Pilates','Amanda','2026-04-23','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1014','Mat Pilates','Amanda','2026-04-30','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
+  ];
+  for (const row of aprilClasses) {
+    await pool.query(`
+      INSERT INTO classes (id,title,instructor,date,time,duration,capacity,description)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      ON CONFLICT (id) DO NOTHING
+    `, row);
+  }
 }
 
 // --- App factory (shared by Railway server and Vercel serverless) ---
