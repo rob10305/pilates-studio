@@ -17,18 +17,15 @@
     .about-hero h1 { font-size: 2.8rem; margin-bottom: 0.4rem; }
     .about-hero .subtitle { margin-bottom: 1rem; }
 
-    /* Image gallery */
+    /* Image */
     .about-images {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      max-width: 860px;
+      max-width: 680px;
       margin: 0 auto 3rem;
       padding: 0 5%;
     }
 
     .about-img-slot {
-      aspect-ratio: 4 / 5;
+      aspect-ratio: 3 / 2;
       border-radius: var(--radius);
       overflow: hidden;
       background: var(--grey-lt);
@@ -88,7 +85,6 @@
     }
 
     @media (max-width: 680px) {
-      .about-images { grid-template-columns: 1fr; }
       .about-hero h1 { font-size: 2rem; }
       .about-bio h2 { font-size: 1.6rem; }
       .about-images { padding: 0 4%; }
@@ -119,13 +115,7 @@
 <!-- Images -->
 <div class="about-images" style="margin-top: 3rem;">
 
-  <!-- Replace src with your own image path when ready, e.g. src="images/amanda-1.jpg" -->
-  <div class="about-img-slot">
-    <span class="placeholder-icon">📷</span>
-    <span>Photo coming soon</span>
-  </div>
-
-  <!-- Replace src with your own image path when ready, e.g. src="images/amanda-2.jpg" -->
+  <!-- Replace src with your own image path when ready, e.g. src="images/amanda.jpg" -->
   <div class="about-img-slot">
     <span class="placeholder-icon">📷</span>
     <span>Photo coming soon</span>
