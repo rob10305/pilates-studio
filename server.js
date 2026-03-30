@@ -69,7 +69,7 @@ async function sendConfirmationEmail({ to, firstName, lastName, cls, registratio
           <div style="background:#fff3f3;border:2px solid #820000;padding:20px;margin:24px 0;border-radius:6px">
             <h3 style="margin:0 0 8px;color:#820000">⚠️ PAY NOW — You have 1 hour</h3>
             <p style="margin:0 0 12px;font-size:13px;color:#5a0000">Your spot is reserved for <strong>1 hour only</strong>. If payment is not received within 1 hour, your spot will be automatically released.</p>
-            <p style="margin:4px 0">Please send <strong>$28</strong> via <strong>Interac e-Transfer</strong> to:</p>
+            <p style="margin:4px 0">Please send <strong>$25</strong> via <strong>Interac e-Transfer</strong> to:</p>
             <p style="margin:10px 0;font-size:18px;font-weight:bold">amanda@redmaplemovement.ca</p>
             <p style="margin:12px 0 0;font-size:12px;color:#666">Cancellations made more than 24 hours before class start are fully refundable. See our <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.</p>
           </div>
@@ -450,6 +450,7 @@ async function initDB() {
   if (parseInt(rows[0].n) === 0) {
     const insert = `INSERT INTO classes (id,title,instructor,date,time,duration,capacity,description) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`;
     const seed = [
+      ['1000','Mat Pilates','Amanda','2026-03-31','11:00',60,12,'Classic mat-based Pilates for full-body conditioning.'],
       ['1001','Foundations Pilates','Sophie Andrews','2026-04-07','09:00',45,10,'Perfect for beginners — build core strength and learn the fundamentals.'],
       ['1002','Mat Pilates','Claire Holt','2026-04-07','11:00',60,12,'Classic mat-based Pilates for full-body conditioning.'],
       ['1003','Power Pilates','James Reid','2026-04-08','07:30',50,8,'High-energy workout for those ready to level up.'],
@@ -464,6 +465,13 @@ async function initDB() {
     for (const row of seed) await pool.query(insert, row);
     console.log('Database seeded with sample classes.');
   }
+
+  // Ensure March 31 class exists (even if DB was already seeded)
+  await pool.query(`
+    INSERT INTO classes (id,title,instructor,date,time,duration,capacity,description)
+    VALUES ('1000','Mat Pilates','Amanda','2026-03-31','11:00',60,12,'Classic mat-based Pilates for full-body conditioning.')
+    ON CONFLICT (id) DO NOTHING
+  `);
 }
 
 // --- App factory (shared by Railway server and Vercel serverless) ---
@@ -903,7 +911,7 @@ async function createApp() {
       await pool.query('DELETE FROM registrations WHERE id = $1', [id]);
 
       const refundMsg = refundEligible
-        ? '<p>As you cancelled more than 24 hours before the class, your $28 payment will be refunded within 2–3 business days.</p>'
+        ? '<p>As you cancelled more than 24 hours before the class, your $25 payment will be refunded within 2–3 business days.</p>'
         : '<p style="color:#9b3a3a"><strong>Note:</strong> Cancellations within 24 hours of class start are not eligible for a refund per our <a href="' + APP_URL + '/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.</p>';
 
       res.send(`

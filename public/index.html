@@ -96,7 +96,7 @@
     </div>
   </div>
   <div class="hero-video-wrap" aria-hidden="true">
-    <video autoplay muted playsinline preload="auto">
+    <video autoplay muted playsinline preload="auto" id="heroVideo">
       <source src="images/MovementANI.mp4" type="video/mp4">
     </video>
   </div>
@@ -114,10 +114,23 @@
     <a href="register.html">Book</a>
     <a href="cancellation-policy.html">Cancellation Policy</a>
   </div>
-  <div class="copyright">&copy; 2026 Red Maple Movement Studio. All rights reserved. | Version 1.0.1</div>
+  <div class="copyright">&copy; 2026 Red Maple Movement Studio. All rights reserved.</div>
 </footer>
 
 <script>
+  // ── Stop animated logo 1 second early ────────────────────────
+  const heroVideo = document.getElementById('heroVideo');
+  if (heroVideo) {
+    heroVideo.addEventListener('loadedmetadata', function() {
+      const stopTime = heroVideo.duration - 1;
+      heroVideo.addEventListener('timeupdate', function() {
+        if (heroVideo.currentTime >= stopTime) {
+          heroVideo.pause();
+        }
+      });
+    });
+  }
+
   // ── Hamburger nav toggle ─────────────────────────────────────
   document.getElementById('navToggle').addEventListener('click', function() {
     this.classList.toggle('open');

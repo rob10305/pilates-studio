@@ -57,7 +57,7 @@
 <div class="page-hero">
   <p class="subtitle">Reserve Your Spot</p>
   <h1>Book a Class</h1>
-  <p>Fill in your details below to secure your place. We can't wait to see you on the mat!</p>
+  <p>Fill in your details below to secure your place.<br>We can't wait to see you on the mat!</p>
 </div>
 
 <div class="register-layout">
@@ -132,7 +132,7 @@
         </div>
       </div>
 
-      <p style="font-size:0.88rem;color:var(--mid);margin-bottom:1rem">Class fee: <strong>$28</strong> — Payment via Interac e-Transfer is required upon booking. See our <a href="cancellation-policy.html" style="color:var(--red)">Cancellation Policy</a>.</p>
+      <p style="font-size:0.88rem;color:var(--mid);margin-bottom:1rem">Class fee: <strong>$25</strong> — Payment via Interac e-Transfer is required upon booking. See our <a href="cancellation-policy.html" style="color:var(--red)">Cancellation Policy</a>.</p>
 
       <button type="submit" class="btn btn-primary form-submit" id="submitBtn">
         Confirm Booking
@@ -143,15 +143,15 @@
 
 <footer>
   <span class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></span>
-  <p>Move well, feel well, live well.</p>
+  <p>Move with Intention. Transform with Strength.</p>
   <p style="margin-bottom:0.5rem">Questions? Reach us at <a href="mailto:amanda@redmaplemovement.ca" style="color:var(--red-lt)">amanda@redmaplemovement.ca</a></p>
   <div class="footer-links">
     <a href="index.html">Home</a>
     <a href="schedule.html">Schedule</a>
-    <a href="register.html">Book a Class</a>
+    <a href="register.html">Book</a>
     <a href="cancellation-policy.html">Cancellation Policy</a>
   </div>
-  <div class="copyright">&copy; 2026 Red Maple Movement Studio. | Version 1.0.1</div>
+  <div class="copyright">&copy; 2026 Red Maple Movement Studio. All rights reserved.</div>
 </footer>
 
 <script>
@@ -180,7 +180,7 @@ async function loadClasses() {
   const upcoming = allClasses
     .filter(c => {
       const d = new Date(`${c.date}T${c.time}`);
-      return d >= now;
+      return d >= now && c.date === '2026-03-31';
     })
     .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
 
@@ -336,7 +336,7 @@ function showSuccess(firstName, lastName, classId) {
       <div style="background:#fff3f3;border:2px solid #820000;border-radius:10px;padding:1.25rem 1.5rem;margin:1.5rem 0;text-align:left">
         
         <p style="font-weight:700;font-size:1.05rem;margin-bottom:0.75rem;color:#820000">Secure your spot</p>
-        <p style="font-size:0.9rem;margin-bottom:0.4rem">Send <strong>$28 CAD</strong> via <strong>Interac e-Transfer</strong> to:</p>
+        <p style="font-size:0.9rem;margin-bottom:0.4rem">Send <strong>$25 CAD</strong> via <strong>Interac e-Transfer</strong> to:</p>
         <p style="font-size:1.1rem;font-weight:700;color:#820000;margin-bottom:0.75rem">amanda@redmaplemovement.ca</p>
         <p style="font-size:0.8rem;color:#888;margin-top:0.5rem">Cancellations more than 24 hours before class start are fully refundable. <a href="cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
       </div>
