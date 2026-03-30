@@ -255,6 +255,7 @@ function showClassesForDate(dateKey) {
           <span>👤 ${cls.instructor}</span>
         </div>
         ${cls.description ? `<p style="font-size:0.8rem;color:var(--mid);margin-top:0.5rem">${cls.description}</p>` : ''}
+        <p style="font-size:0.8rem;color:var(--mid);margin-top:0.5rem">📍 Nassagaweya Tennis Centre &amp; Community Hall, 9267 Guelph Line, Campbellville, ON L0P 1B0</p>
         ${!isFull ? `<div style="margin-top:0.75rem"><button class="btn btn-sage btn-sm" onclick="event.stopPropagation();bookClass('${cls.id}')">Book Now</button></div>` : '<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--light)">Class is fully booked</div>'}
       </div>`;
   }).join('');
