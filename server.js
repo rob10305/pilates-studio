@@ -44,6 +44,38 @@ function formatClassDate(dateStr) {
 
 const FROM_ADDRESS = 'Red Maple Movement <bookings@redmaplemovement.ca>';
 
+// Shared email layout matching the branded card design
+function emailWrap({ heading, subtitle, detailRows, body, buttonLabel, buttonUrl }) {
+  const rowsHtml = detailRows ? detailRows.map(([label, value]) =>
+    `<tr><td style="padding:10px 0;border-bottom:1px solid #e8e3dd;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#820000;width:120px;vertical-align:top">${label}</td><td style="padding:10px 0 10px 16px;border-bottom:1px solid #e8e3dd;font-size:15px;color:#3a3a3a">${value}</td></tr>`
+  ).join('') : '';
+
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;background:#FAF7F2;padding:40px 20px">
+      <div style="background:#fff;border:1px solid #e8e3dd;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06)">
+        <div style="padding:40px 36px;text-align:center">
+          <p style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#820000;margin:0 0 12px;font-weight:600">MOVE. BREATHE. TRANSFORM.</p>
+          <h1 style="font-family:Georgia,serif;font-size:28px;color:#3a3a3a;margin:0 0 8px;font-weight:700;line-height:1.2">${heading}</h1>
+          ${subtitle ? `<p style="font-size:15px;color:#6b6b6b;margin:0">${subtitle}</p>` : ''}
+        </div>
+        ${detailRows ? `
+        <div style="padding:0 36px">
+          <div style="border-top:1px solid #e8e3dd;margin-bottom:8px"></div>
+          <table style="width:100%;border-collapse:collapse">${rowsHtml}</table>
+        </div>` : ''}
+        ${body ? `<div style="padding:24px 36px 0;text-align:center">${body}</div>` : ''}
+        ${buttonLabel ? `
+        <div style="padding:28px 36px 36px;text-align:center">
+          <a href="${buttonUrl}" style="display:inline-block;background:#820000;color:#fff;padding:14px 40px;border-radius:50px;text-decoration:none;font-weight:700;font-size:15px;letter-spacing:0.03em">${buttonLabel}</a>
+        </div>` : '<div style="padding:0 0 36px"></div>'}
+      </div>
+      <div style="text-align:center;padding:24px 0 0">
+        <p style="font-size:13px;color:#6b6b6b;margin:0 0 4px">Red Maple Movement</p>
+        <a href="${APP_URL}" style="font-size:13px;color:#820000;text-decoration:none">redmaplemovement.ca</a>
+      </div>
+    </div>`;
+}
+
 async function sendConfirmationEmail({ to, firstName, lastName, cls, registrationId }) {
   if (!process.env.RESEND_API_KEY) return;
   const cancelUrl = `${APP_URL}/api/registrations/${registrationId}/cancel?token=${cancelToken(registrationId)}`;
@@ -51,35 +83,29 @@ async function sendConfirmationEmail({ to, firstName, lastName, cls, registratio
     from: FROM_ADDRESS,
     to,
     subject: `Booking Confirmed: ${cls.title} on ${formatClassDate(cls.date)}`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
-        <div style="background:#820000;padding:24px;text-align:center">
-          <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
+    html: emailWrap({
+      heading: 'Booking Confirmed',
+      subtitle: 'Your class has been successfully reserved.',
+      detailRows: [
+        ['Name', `${firstName} ${lastName}`],
+        ['Email', to],
+        ['Class', cls.title],
+        ['Date', formatClassDate(cls.date)],
+        ['Time', formatClassTime(cls.time)],
+        ['Instructor', cls.instructor],
+      ],
+      body: `
+        <div style="background:#FAF7F2;border:1px solid #e8e3dd;border-radius:8px;padding:16px;margin-bottom:8px">
+          <p style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#6b6b6b;margin:0 0 4px;font-weight:700">SECURE YOUR SPOT</p>
+          <p style="font-family:Georgia,serif;font-size:22px;color:#820000;font-weight:700;margin:0 0 6px">$25 CAD</p>
+          <p style="font-size:13px;color:#6b6b6b;margin:0 0 2px">Send via Interac e-Transfer to</p>
+          <p style="font-size:15px;font-weight:700;color:#3a3a3a;margin:0">amanda@redmaplemovement.ca</p>
         </div>
-        <div style="padding:32px">
-          <h2 style="color:#820000">You're booked, ${firstName}!</h2>
-          <p>Your spot in <strong>${cls.title}</strong> is reserved — please complete payment to confirm your place.</p>
-          <div style="background:#f9f9f9;border-left:4px solid #820000;padding:16px;margin:24px 0;border-radius:4px">
-            <p style="margin:4px 0"><strong>Class:</strong> ${cls.title}</p>
-            <p style="margin:4px 0"><strong>Date:</strong> ${formatClassDate(cls.date)}</p>
-            <p style="margin:4px 0"><strong>Time:</strong> ${formatClassTime(cls.time)}</p>
-            <p style="margin:4px 0"><strong>Instructor:</strong> ${cls.instructor}</p>
-            <p style="margin:4px 0"><strong>Duration:</strong> ${cls.duration} minutes</p>
-          </div>
-          <div style="background:#fff3f3;border:2px solid #820000;padding:20px;margin:24px 0;border-radius:6px">
-            <h3 style="margin:0 0 8px;color:#820000">⚠️ PAY NOW — You have 1 hour</h3>
-            <p style="margin:0 0 12px;font-size:13px;color:#5a0000">Your spot is reserved for <strong>1 hour only</strong>. If payment is not received within 1 hour, your spot will be automatically released.</p>
-            <p style="margin:4px 0">Please send <strong>$25</strong> via <strong>Interac e-Transfer</strong> to:</p>
-            <p style="margin:10px 0;font-size:18px;font-weight:bold">amanda@redmaplemovement.ca</p>
-            <p style="margin:12px 0 0;font-size:12px;color:#666">Cancellations made more than 24 hours before class start are fully refundable. See our <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.</p>
-          </div>
-          <p>We'll send you a reminder 24 hours before your class.</p>
-          <p>Need to cancel? <a href="${cancelUrl}" style="color:#820000">Click here to cancel your booking</a>.</p>
-        </div>
-        <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
-          Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#820000">${APP_URL}</a>
-        </div>
-      </div>`
+        <p style="font-size:12px;color:#b0b0b0;margin:8px 0 0">Your spot is held for 1 hour pending payment. <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
+        <p style="font-size:13px;color:#6b6b6b;margin:12px 0 0">Need to cancel? <a href="${cancelUrl}" style="color:#820000">Cancel your booking</a></p>`,
+      buttonLabel: 'Manage My Booking',
+      buttonUrl: `${APP_URL}/my-schedule.html`
+    })
   });
 }
 
@@ -125,27 +151,19 @@ async function sendRemovalEmail({ to, firstName, cls }) {
     from: FROM_ADDRESS,
     to,
     subject: `Your booking for ${cls.title} has been cancelled`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
-        <div style="background:#8B1A1A;padding:24px;text-align:center">
-          <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
-        </div>
-        <div style="padding:32px">
-          <h2 style="color:#8B1A1A">Booking Cancelled, ${firstName}</h2>
-          <p>We wanted to let you know that your spot in the following class has been cancelled by the studio:</p>
-          <div style="background:#f9f9f9;border-left:4px solid #8B1A1A;padding:16px;margin:24px 0;border-radius:4px">
-            <p style="margin:4px 0"><strong>Class:</strong> ${cls.title}</p>
-            <p style="margin:4px 0"><strong>Date:</strong> ${formatClassDate(cls.date)}</p>
-            <p style="margin:4px 0"><strong>Time:</strong> ${formatClassTime(cls.time)}</p>
-            <p style="margin:4px 0"><strong>Instructor:</strong> ${cls.instructor}</p>
-          </div>
-          <p>If you have any questions, please contact us directly.</p>
-          <a href="${APP_URL}" style="display:inline-block;background:#8B1A1A;color:#fff;padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:bold">Visit Red Maple Movement</a>
-        </div>
-        <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
-          Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#8B1A1A">${APP_URL}</a>
-        </div>
-      </div>`
+    html: emailWrap({
+      heading: 'Booking Cancelled',
+      subtitle: `Your spot in ${cls.title} has been cancelled by the studio.`,
+      detailRows: [
+        ['Class', cls.title],
+        ['Date', formatClassDate(cls.date)],
+        ['Time', formatClassTime(cls.time)],
+        ['Instructor', cls.instructor],
+      ],
+      body: `<p style="font-size:14px;color:#6b6b6b">If you have any questions, please contact us at <a href="mailto:amanda@redmaplemovement.ca" style="color:#820000">amanda@redmaplemovement.ca</a>.</p>`,
+      buttonLabel: 'Visit Red Maple Movement',
+      buttonUrl: APP_URL
+    })
   });
 }
 
@@ -156,28 +174,20 @@ async function sendReminderEmail({ to, firstName, cls, registrationId }) {
     from: FROM_ADDRESS,
     to,
     subject: `Reminder: ${cls.title} is tomorrow at ${formatClassTime(cls.time)}`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
-        <div style="background:#8B1A1A;padding:24px;text-align:center">
-          <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
-        </div>
-        <div style="padding:32px">
-          <h2 style="color:#8B1A1A">See you tomorrow, ${firstName}!</h2>
-          <p>This is a friendly reminder about your class tomorrow.</p>
-          <div style="background:#f9f9f9;border-left:4px solid #8B1A1A;padding:16px;margin:24px 0;border-radius:4px">
-            <p style="margin:4px 0"><strong>Class:</strong> ${cls.title}</p>
-            <p style="margin:4px 0"><strong>Date:</strong> ${formatClassDate(cls.date)}</p>
-            <p style="margin:4px 0"><strong>Time:</strong> ${formatClassTime(cls.time)}</p>
-            <p style="margin:4px 0"><strong>Instructor:</strong> ${cls.instructor}</p>
-            <p style="margin:4px 0"><strong>Duration:</strong> ${cls.duration} minutes</p>
-          </div>
-          <p>Can't make it? Please cancel so your spot can go to someone else.</p>
-          <a href="${cancelUrl}" style="display:inline-block;background:#8B1A1A;color:#fff;padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:bold">Cancel My Booking</a>
-        </div>
-        <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
-          Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#8B1A1A">${APP_URL}</a>
-        </div>
-      </div>`
+    html: emailWrap({
+      heading: `See You Tomorrow, ${firstName}!`,
+      subtitle: 'This is a friendly reminder about your class.',
+      detailRows: [
+        ['Class', cls.title],
+        ['Date', formatClassDate(cls.date)],
+        ['Time', formatClassTime(cls.time)],
+        ['Instructor', cls.instructor],
+        ['Duration', `${cls.duration} minutes`],
+      ],
+      body: `<p style="font-size:14px;color:#6b6b6b">Can't make it? <a href="${cancelUrl}" style="color:#820000">Cancel your booking</a> so your spot can go to someone else.</p>`,
+      buttonLabel: 'Manage My Booking',
+      buttonUrl: `${APP_URL}/my-schedule.html`
+    })
   });
 }
 
@@ -237,28 +247,20 @@ async function sendPaymentConfirmedEmail({ to, firstName, cls }) {
     from: FROM_ADDRESS,
     to,
     subject: `Payment Confirmed — See you in ${cls.title}!`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
-        <div style="background:#820000;padding:24px;text-align:center">
-          <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
-        </div>
-        <div style="padding:32px">
-          <h2 style="color:#2d6a2d">Payment Received — You're all set, ${firstName}!</h2>
-          <p>We've received your payment and your spot is officially confirmed. We can't wait to see you on the mat!</p>
-          <div style="background:#f9f9f9;border-left:4px solid #820000;padding:16px;margin:24px 0;border-radius:4px">
-            <p style="margin:4px 0"><strong>Class:</strong> ${cls.title}</p>
-            <p style="margin:4px 0"><strong>Date:</strong> ${formatClassDate(cls.date)}</p>
-            <p style="margin:4px 0"><strong>Time:</strong> ${formatClassTime(cls.time)}</p>
-            <p style="margin:4px 0"><strong>Instructor:</strong> ${cls.instructor}</p>
-            <p style="margin:4px 0"><strong>Duration:</strong> ${cls.duration} minutes</p>
-          </div>
-          <p>Need to cancel? Please let us know more than 24 hours before class for a full refund. See our <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.</p>
-          <a href="${APP_URL}/my-schedule.html" style="display:inline-block;background:#820000;color:#fff;padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:bold">View My Schedule</a>
-        </div>
-        <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
-          Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#820000">${APP_URL}</a>
-        </div>
-      </div>`
+    html: emailWrap({
+      heading: `Payment Confirmed`,
+      subtitle: `You're all set, ${firstName}! We can't wait to see you on the mat.`,
+      detailRows: [
+        ['Class', cls.title],
+        ['Date', formatClassDate(cls.date)],
+        ['Time', formatClassTime(cls.time)],
+        ['Instructor', cls.instructor],
+        ['Duration', `${cls.duration} minutes`],
+      ],
+      body: `<p style="font-size:13px;color:#b0b0b0">Cancellations more than 24 hours before class are fully refundable. <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>`,
+      buttonLabel: 'View My Schedule',
+      buttonUrl: `${APP_URL}/my-schedule.html`
+    })
   });
 }
 
@@ -268,25 +270,20 @@ async function sendPaymentReleasedEmail({ to, firstName, cls }) {
     from: FROM_ADDRESS,
     to,
     subject: `Your spot in ${cls.title} — Payment not received`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
-        <div style="background:#820000;padding:24px;text-align:center">
-          <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
-        </div>
-        <div style="padding:32px">
-          <h2 style="color:#820000">Oops — Looks Like We Missed Your Payment, ${firstName}</h2>
-          <p>We weren't able to confirm payment for your reserved spot in <strong>${cls.title}</strong>, so we've released it back to the waitlist.</p>
-          <div style="background:#f9f9f9;border-left:4px solid #820000;padding:16px;margin:24px 0;border-radius:4px">
-            <p style="margin:4px 0"><strong>Class:</strong> ${cls.title}</p>
-            <p style="margin:4px 0"><strong>Date:</strong> ${formatClassDate(cls.date)}</p>
-            <p style="margin:4px 0"><strong>Time:</strong> ${formatClassTime(cls.time)}</p>
-          </div>
-          <p>If you'd still like to join us, we'd love to have you! Simply book your spot again and complete your e-Transfer payment right away to lock it in.</p>
-          <a href="${APP_URL}/register.html" style="display:inline-block;background:#820000;color:#fff;padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:bold">Book Again</a>
-          <p style="margin-top:24px;font-size:0.85rem;color:#666">If you think this is a mistake or already sent payment, please reply to this email or contact us at <a href="mailto:amanda@redmaplemovement.ca" style="color:#820000">amanda@redmaplemovement.ca</a>.</p>
-        </div>
-        <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
-          Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#820000">${APP_URL}</a>
+    html: emailWrap({
+      heading: 'Spot Released',
+      subtitle: `We weren't able to confirm payment for ${cls.title}.`,
+      detailRows: [
+        ['Class', cls.title],
+        ['Date', formatClassDate(cls.date)],
+        ['Time', formatClassTime(cls.time)],
+      ],
+      body: `
+        <p style="font-size:14px;color:#6b6b6b;margin:0 0 8px">Your spot has been released. If you'd still like to join us, simply book again and complete payment right away.</p>
+        <p style="font-size:13px;color:#b0b0b0;margin:0">Think this is a mistake? Contact <a href="mailto:amanda@redmaplemovement.ca" style="color:#820000">amanda@redmaplemovement.ca</a></p>`,
+      buttonLabel: 'Book Again',
+      buttonUrl: `${APP_URL}/register.html`
+    })
         </div>
       </div>`
   });
@@ -921,22 +918,22 @@ async function createApp() {
 
       await pool.query('DELETE FROM registrations WHERE id = $1', [id]);
 
-      const refundMsg = refundEligible
-        ? '<p>As you cancelled more than 24 hours before the class, your $25 payment will be refunded within 2–3 business days.</p>'
-        : '<p style="color:#9b3a3a"><strong>Note:</strong> Cancellations within 24 hours of class start are not eligible for a refund per our <a href="' + APP_URL + '/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.</p>';
+      const refundNote = refundEligible
+        ? 'As you cancelled more than 24 hours before the class, your $25 payment will be refunded within 2–3 business days.'
+        : 'Cancellations within 24 hours of class start are not eligible for a refund per our <a href="' + APP_URL + '/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.';
 
-      res.send(`
-        <div style="font-family:Arial,sans-serif;max-width:500px;margin:80px auto;text-align:center;color:#333">
-          <div style="background:#820000;padding:20px;border-radius:8px 8px 0 0">
-            <h1 style="color:#fff;margin:0">Red Maple Movement</h1>
-          </div>
-          <div style="border:1px solid #ddd;border-top:none;padding:40px;border-radius:0 0 8px 8px">
-            <h2 style="color:#820000">Booking Cancelled</h2>
-            <p>Your booking for <strong>${reg.title}</strong> has been successfully cancelled.</p>
-            ${refundMsg}
-            <a href="${APP_URL}" style="display:inline-block;background:#820000;color:#fff;padding:12px 28px;border-radius:4px;text-decoration:none;margin-top:16px">Back to Red Maple Movement</a>
-          </div>
-        </div>`);
+      res.send(emailWrap({
+        heading: 'Booking Cancelled',
+        subtitle: `Your booking for ${reg.title} has been successfully cancelled.`,
+        detailRows: [
+          ['Class', reg.title],
+          ['Date', formatClassDate(reg.date)],
+          ['Time', formatClassTime(reg.time)],
+        ],
+        body: `<p style="font-size:14px;color:#6b6b6b">${refundNote}</p>`,
+        buttonLabel: 'Back to Red Maple Movement',
+        buttonUrl: APP_URL
+      }));
     } catch (e) { console.error(e); res.status(500).send('<h2>Something went wrong. Please try again.</h2>'); }
   });
 
