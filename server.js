@@ -446,7 +446,9 @@ async function initDB() {
   `);
 
   // Clean up: remove all classes except our official April schedule
-  await pool.query(`DELETE FROM classes WHERE id NOT IN ('1010','1011','1012','1013','1014')`);
+  try {
+    await pool.query(`DELETE FROM classes WHERE id NOT IN ('1010','1011','1012','1013','1014')`);
+  } catch (e) { console.error('Class cleanup error (non-fatal):', e.message); }
 
   // Ensure April classes exist (upsert)
   const aprilClasses = [
@@ -460,22 +462,27 @@ async function initDB() {
     await pool.query(`
       INSERT INTO classes (id,title,instructor,date,time,duration,capacity,description)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-      ON CONFLICT (id) DO UPDATE SET title=$2, instructor=$3, date=$4, time=$5, duration=$6, capacity=$7, description=$8
+      ON CONFLICT (id) DO UPDATE SET
+        title=EXCLUDED.title, instructor=EXCLUDED.instructor, date=EXCLUDED.date,
+        time=EXCLUDED.time, duration=EXCLUDED.duration, capacity=EXCLUDED.capacity,
+        description=EXCLUDED.description
     `, row);
   }
 
   // Make April 2 class appear full by inserting 12 placeholder registrations
-  const { rows: apr2Regs } = await pool.query(`SELECT COUNT(*)::int AS n FROM registrations WHERE "classId" = '1010'`);
-  const apr2Count = apr2Regs[0].n;
-  if (apr2Count < 12) {
-    for (let i = apr2Count + 1; i <= 12; i++) {
-      await pool.query(
-        `INSERT INTO registrations (id, "classId", "firstName", "lastName", email, phone) VALUES ($1,$2,$3,$4,$5,$6)
-         ON CONFLICT (id) DO NOTHING`,
-        [`apr2-placeholder-${i}`, '1010', 'Reserved', 'Spot', `reserved${i}@placeholder.local`, '']
-      );
+  try {
+    const { rows: apr2Regs } = await pool.query(`SELECT COUNT(*)::int AS n FROM registrations WHERE "classId" = '1010'`);
+    const apr2Count = apr2Regs[0].n;
+    if (apr2Count < 12) {
+      for (let i = apr2Count + 1; i <= 12; i++) {
+        await pool.query(
+          `INSERT INTO registrations (id, "classId", "firstName", "lastName", email, phone) VALUES ($1,$2,$3,$4,$5,$6)
+           ON CONFLICT (id) DO NOTHING`,
+          [`apr2-placeholder-${i}`, '1010', 'Reserved', 'Spot', `reserved${i}@placeholder.local`, '']
+        );
+      }
     }
-  }
+  } catch (e) { console.error('April 2 placeholder error (non-fatal):', e.message); }
 }
 
 // --- App factory (shared by Railway server and Vercel serverless) ---
