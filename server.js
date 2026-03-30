@@ -476,9 +476,9 @@ async function initDB() {
     if (apr2Count < 12) {
       for (let i = apr2Count + 1; i <= 12; i++) {
         await pool.query(
-          `INSERT INTO registrations (id, "classId", "firstName", "lastName", email, phone) VALUES ($1,$2,$3,$4,$5,$6)
+          `INSERT INTO registrations (id, "classId", "firstName", "lastName", email, phone, "registeredAt") VALUES ($1,$2,$3,$4,$5,$6,$7)
            ON CONFLICT (id) DO NOTHING`,
-          [`apr2-placeholder-${i}`, '1010', 'Reserved', 'Spot', `reserved${i}@placeholder.local`, '']
+          [`apr2-placeholder-${i}`, '1010', 'Reserved', 'Spot', `reserved${i}@placeholder.local`, '', new Date().toISOString()]
         );
       }
     }
