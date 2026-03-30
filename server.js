@@ -85,7 +85,7 @@ async function sendConfirmationEmail({ to, firstName, lastName, cls, registratio
     subject: `Booking Confirmed: ${cls.title} on ${formatClassDate(cls.date)}`,
     html: emailWrap({
       heading: 'Booking Confirmed',
-      subtitle: `Your spot in ${cls.title} is held — please complete payment to confirm.`,
+      subtitle: `Your spot is reserved for the next hour. Please complete payment to confirm your spot in class.`,
       detailRows: [
         ['Name', `${firstName} ${lastName}`],
         ['Email', to],
