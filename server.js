@@ -447,11 +447,11 @@ async function initDB() {
 
   // Ensure April classes exist (upsert)
   const aprilClasses = [
-    ['1010','Mat Pilates','Amanda','2026-04-02','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ['1011','Mat Pilates','Amanda','2026-04-09','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ['1012','Mat Pilates','Amanda','2026-04-16','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ['1013','Mat Pilates','Amanda','2026-04-23','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ['1014','Mat Pilates','Amanda','2026-04-30','11:10',60,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1010','Mat Pilates','Amanda','2026-04-02','11:00',50,12,'Private Booking'],
+    ['1011','Mat Pilates','Amanda','2026-04-09','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1012','Mat Pilates','Amanda','2026-04-16','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1013','Mat Pilates','Amanda','2026-04-23','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1014','Mat Pilates','Amanda','2026-04-30','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
   ];
   for (const row of aprilClasses) {
     await pool.query(`
