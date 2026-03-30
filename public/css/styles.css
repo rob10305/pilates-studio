@@ -427,9 +427,9 @@ section { padding: 80px 5%; }
   white-space: nowrap;
 }
 
-.availability.open { background: #ebebeb; color: #3a3a3a; }
-.availability.few { background: #f5e8e7; color: #7a1a14; }
-.availability.full-badge { background: #e0e0e0; color: #5a5a5a; }
+.availability.open { background: #e8f5e9; color: #2e7d32; }
+.availability.few { background: #fff8e1; color: #f9a825; }
+.availability.full-badge { background: #ffebee; color: #c62828; }
 
 .class-item-meta { font-size: 0.82rem; color: var(--mid); }
 .class-item-meta span { margin-right: 0.75rem; }
