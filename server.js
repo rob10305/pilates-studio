@@ -284,8 +284,6 @@ async function sendPaymentReleasedEmail({ to, firstName, cls }) {
       buttonLabel: 'Book Again',
       buttonUrl: `${APP_URL}/register.html`
     })
-        </div>
-      </div>`
   });
 }
 
