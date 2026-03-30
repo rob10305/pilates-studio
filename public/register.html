@@ -328,22 +328,22 @@ function showSuccess(firstName, lastName, classId) {
   const clsDate = cls ? formatDate(cls.date) : '';
   const card = document.getElementById('formCard');
   card.innerHTML = `
-    <div class="success-card">
-      <span class="success-icon">✅</span>
-      <h3>Spot Reserved, ${firstName}!</h3>
-      <p>Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is held — complete payment to confirm.</p>
+    <div class="success-card" style="text-align:center;padding:2.5rem 2rem">
+      <p class="subtitle" style="font-size:0.8rem;letter-spacing:0.14em;margin-bottom:1rem">MOVE. BREATHE. TRANSFORM.</p>
+      <h2 style="font-family:'Playfair Display',serif;font-size:2rem;margin-bottom:1rem;line-height:1.2">Spot Reserved,<br>${firstName}</h2>
+      <p style="color:var(--mid);margin-bottom:2rem">Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is being held while payment is completed.</p>
 
-      <div style="background:#fff3f3;border:2px solid #820000;border-radius:10px;padding:1.25rem 1.5rem;margin:1.5rem 0;text-align:left">
-        
-        <p style="font-weight:700;font-size:1.05rem;margin-bottom:0.75rem;color:#820000">Secure your spot</p>
-        <p style="font-size:0.9rem;margin-bottom:0.4rem">Send <strong>$25 CAD</strong> via <strong>Interac e-Transfer</strong> to:</p>
-        <p style="font-size:1.1rem;font-weight:700;color:#820000;margin-bottom:0.75rem">amanda@redmaplemovement.ca</p>
-        <p style="font-size:0.8rem;color:#888;margin-top:0.5rem">Cancellations more than 24 hours before class start are fully refundable. <a href="cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
-      </div>
+      <div style="width:60px;height:1px;background:var(--border);margin:0 auto 2rem"></div>
 
-      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
-        <a href="my-schedule.html" class="btn btn-primary">View My Schedule</a>
-        <a href="register.html" class="btn btn-outline">Book Another</a>
+      <p style="font-size:0.8rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--mid);margin-bottom:0.5rem">SECURE YOUR SPOT</p>
+      <p style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:#820000;margin-bottom:0.75rem">$25 CAD</p>
+      <p style="font-size:0.9rem;color:var(--mid);margin-bottom:0.25rem">Send via Interac e-Transfer to</p>
+      <p style="font-size:1.05rem;font-weight:700;color:var(--charcoal);margin-bottom:1.25rem">amanda@redmaplemovement.ca</p>
+      <p style="font-size:0.8rem;color:var(--light);margin-bottom:2.5rem">Cancellations made more than 24 hours before class start are fully refundable. <a href="cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem">
+        <a href="my-schedule.html" class="btn btn-primary" style="width:100%;text-align:center">View My Schedule</a>
+        <a href="register.html" class="btn btn-outline" style="width:100%;text-align:center">Book Another Class</a>
       </div>
     </div>`;
 }
