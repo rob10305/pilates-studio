@@ -109,7 +109,7 @@
               </div>
               <div class="form-group">
                 <label for="newInstructor">Instructor</label>
-                <input type="text" id="newInstructor" placeholder="e.g. Sophie Andrews">
+                <input type="text" id="newInstructor" value="Amanda Stevens">
               </div>
             </div>
             <div class="form-row">
@@ -135,6 +135,14 @@
             <div class="form-group">
               <label for="newDescription">Description (optional)</label>
               <input type="text" id="newDescription" placeholder="Brief class description...">
+            </div>
+            <div class="form-group">
+              <label for="newLocation">Location</label>
+              <div style="position:relative">
+                <input type="text" id="newLocation" placeholder="Start typing an address..." autocomplete="off"
+                       value="Nassagaweya Tennis Centre & Community Hall, 9267 Guelph Line, Campbellville, ON L0P 1B0">
+                <div id="locationSuggestions" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;background:var(--white);border:1px solid var(--border);border-radius:0 0 8px 8px;box-shadow:var(--shadow);max-height:200px;overflow-y:auto"></div>
+              </div>
             </div>
             <button type="submit" class="btn btn-primary" id="addBtn">Add Class</button>
           </form>
@@ -383,6 +391,8 @@ async function addClass(e) {
       alert.style.display = 'block';
       document.getElementById('addClassForm').reset();
       document.getElementById('newDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('newInstructor').value = 'Amanda Stevens';
+      document.getElementById('newLocation').value = 'Nassagaweya Tennis Centre & Community Hall, 9267 Guelph Line, Campbellville, ON L0P 1B0';
       loadDashboard();
     } else {
       alert.className = 'alert alert-error';
@@ -728,7 +738,51 @@ async function saveSettings() {
   setTimeout(() => { alert.style.display = 'none'; }, 4000);
 }
 
+// ── Location autocomplete (Google Places) ─────────────────────
+function initLocationAutocomplete() {
+  const input = document.getElementById('newLocation');
+  const sugBox = document.getElementById('locationSuggestions');
+  if (!window.google || !google.maps || !google.maps.places) return;
+
+  const service = new google.maps.places.AutocompleteService();
+  let debounce;
+
+  input.addEventListener('input', function() {
+    clearTimeout(debounce);
+    const q = this.value.trim();
+    if (q.length < 3) { sugBox.style.display = 'none'; return; }
+    debounce = setTimeout(() => {
+      service.getPlacePredictions({ input: q, componentRestrictions: { country: 'ca' } }, (predictions, status) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
+          sugBox.style.display = 'none';
+          return;
+        }
+        sugBox.innerHTML = predictions.map(p =>
+          `<div style="padding:0.6rem 1rem;cursor:pointer;font-size:0.9rem;border-bottom:1px solid var(--border);transition:background 0.15s"
+                onmousedown="document.getElementById('newLocation').value='${p.description.replace(/'/g, "\\'")}';document.getElementById('locationSuggestions').style.display='none'"
+                onmouseover="this.style.background='var(--cream)'" onmouseout="this.style.background=''">${p.description}</div>`
+        ).join('');
+        sugBox.style.display = 'block';
+      });
+    }, 250);
+  });
+
+  input.addEventListener('blur', () => { setTimeout(() => { sugBox.style.display = 'none'; }, 200); });
+}
+
 document.addEventListener('DOMContentLoaded', init);
+</script>
+<script>
+  // Load Google Places API — only activates if API key is configured
+  (function() {
+    const script = document.createElement('script');
+    script.src = 'https://maps.googleapis.com/maps/api/js?libraries=places&callback=initLocationAutocomplete';
+    script.async = true;
+    script.defer = true;
+    // Autocomplete degrades gracefully — field still works as plain text without API key
+    script.onerror = function() { console.log('Google Places API not available — location field will work as plain text input.'); };
+    document.head.appendChild(script);
+  })();
 </script>
 <script src="js/auth.js"></script>
 </body>

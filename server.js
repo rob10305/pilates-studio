@@ -452,6 +452,9 @@ async function initDB() {
     ['1012','Mat Pilates','Amanda','2026-04-16','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1013','Mat Pilates','Amanda','2026-04-23','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1014','Mat Pilates','Amanda','2026-04-30','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1015','Mat Pilates','Amanda','2026-04-09','12:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1016','Mat Pilates','Amanda','2026-04-16','12:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1017','Mat Pilates','Amanda','2026-04-30','12:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
   ];
   for (const row of aprilClasses) {
     await pool.query(`
@@ -1139,11 +1142,13 @@ async function createApp() {
     if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not signed in.' });
     try {
       const { rows } = await pool.query(
-        'SELECT id, first_name, last_name, email, phone, emergency_name, emergency_phone, health_conditions, signature_data, signed_at FROM waivers WHERE user_id = $1 ORDER BY signed_at DESC LIMIT 1',
-        [req.user.id]
+        'SELECT id, first_name, last_name, email, phone, emergency_name, emergency_phone, health_conditions, signature_data, signed_at FROM waivers WHERE user_id = $1 OR LOWER(email) = LOWER($2) ORDER BY signed_at DESC LIMIT 1',
+        [req.user.id, req.user.email]
       );
       if (rows.length === 0) return res.status(404).json({ error: 'No waiver found.' });
-      res.json({ waiver: rows[0] });
+      const w = rows[0];
+      const viewUrl = `/api/waiver/view/${w.id}?token=${waiverViewToken(w.id)}`;
+      res.json({ waiver: { ...w, viewUrl } });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
