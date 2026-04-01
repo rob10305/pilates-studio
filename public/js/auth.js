@@ -36,3 +36,33 @@
     li.innerHTML = `<a href="login.html">Sign In</a>`;
   }
 })();
+
+// ── Mobile: auto-hide top nav on scroll down, show on scroll up ──
+(function () {
+  if (window.innerWidth > 680) return;
+  const nav = document.querySelector('nav');
+  if (!nav) return;
+  let lastY = window.scrollY;
+  let ticking = false;
+
+  window.addEventListener('scroll', function () {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () {
+      const y = window.scrollY;
+      // Only hide after scrolling past the nav height
+      if (y > 70 && y > lastY) {
+        nav.classList.add('nav-hidden');
+        // Close hamburger menu if open
+        const toggle = document.getElementById('navToggle');
+        const links = document.getElementById('navLinks');
+        if (toggle) toggle.classList.remove('open');
+        if (links) links.classList.remove('open');
+      } else {
+        nav.classList.remove('nav-hidden');
+      }
+      lastY = y;
+      ticking = false;
+    });
+  }, { passive: true });
+})();
