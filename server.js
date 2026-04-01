@@ -117,31 +117,24 @@ function waiverViewToken(waiverId) {
 async function sendWaiverConfirmationEmail({ to, firstName, waiverId, signedAt }) {
   if (!process.env.RESEND_API_KEY) return;
   const viewUrl = `${APP_URL}/api/waiver/view/${waiverId}?token=${waiverViewToken(waiverId)}`;
+  const signedDate = new Date(signedAt).toLocaleDateString('en-CA', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   await getResend().emails.send({
     from: FROM_ADDRESS,
     to,
-    subject: 'Your Red Maple Movement Waiver — Signed Successfully',
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
-        <div style="background:#8B1A1A;padding:24px;text-align:center">
-          <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
-        </div>
-        <div style="padding:32px">
-          <h2 style="color:#8B1A1A">Waiver Received, ${firstName}!</h2>
-          <p>Thank you — your liability waiver has been successfully signed and is on file with Red Maple Movement.</p>
-          <div style="background:#f9f9f9;border-left:4px solid #8B1A1A;padding:16px;margin:24px 0;border-radius:4px">
-            <p style="margin:4px 0"><strong>Signed by:</strong> ${firstName}</p>
-            <p style="margin:4px 0"><strong>Date:</strong> ${new Date(signedAt).toLocaleDateString('en-CA', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}</p>
-            <p style="margin:4px 0"><strong>Email:</strong> ${to}</p>
-          </div>
-          <p>You can view and download a copy of your signed waiver at any time using the link below.</p>
-          <a href="${viewUrl}" style="display:inline-block;background:#8B1A1A;color:#fff;padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:bold">View My Waiver</a>
-          <p style="margin-top:24px;font-size:0.85rem;color:#999">Keep this email — the link above provides permanent access to your waiver copy.</p>
-        </div>
-        <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
-          Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#8B1A1A">${APP_URL}</a>
-        </div>
-      </div>`
+    subject: `Waiver Signed: ${signedDate}`,
+    html: emailWrap({
+      heading: 'Waiver Received',
+      subtitle: `Thank you, ${firstName} — your liability waiver has been successfully signed and is on file.`,
+      detailRows: [
+        ['Signed By', firstName],
+        ['Date', signedDate],
+        ['Email', to],
+      ],
+      body: `<p style="font-size:13px;color:#6b6b6b;margin:0">You can view and download a copy of your signed waiver at any time using the button below.</p>
+             <p style="font-size:12px;color:#b0b0b0;margin:8px 0 0">Keep this email — the link provides permanent access to your waiver copy.</p>`,
+      buttonLabel: 'View My Waiver',
+      buttonUrl: viewUrl
+    })
   });
 }
 
