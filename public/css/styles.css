@@ -686,23 +686,10 @@ footer .copyright { font-size: 0.8rem; color: rgba(255,255,255,0.4); border-top:
   nav.nav-hidden {
     transform: translateY(-100%);
   }
-  .nav-toggle { display: flex; }
+  .nav-toggle { display: none; }
   .nav-links {
-    display: none;
-    position: absolute;
-    top: 70px;
-    left: 0; right: 0;
-    background: rgba(250,247,242,0.98);
-    backdrop-filter: blur(8px);
-    flex-direction: column;
-    padding: 0.5rem 0 1.5rem;
-    border-bottom: 1px solid var(--border);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-    gap: 0;
-    list-style: none;
-    z-index: 100;
+    display: none !important;
   }
-  .nav-links.open { display: flex; }
   .nav-links li { width: 100%; }
   .nav-links a {
     display: block;
