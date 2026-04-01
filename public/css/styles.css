@@ -676,15 +676,9 @@ footer .copyright { font-size: 0.8rem; color: rgba(255,255,255,0.4); border-top:
 /* Mobile */
 @media (max-width: 680px) {
 
-  /* Nav — hamburger + auto-hide on scroll */
+  /* Hide top nav entirely on mobile — bottom nav handles navigation */
   nav {
-    padding: 0 4%;
-    position: sticky;
-    top: 0;
-    transition: transform 0.3s ease;
-  }
-  nav.nav-hidden {
-    transform: translateY(-100%);
+    display: none !important;
   }
   .nav-toggle { display: none; }
   .nav-links {
