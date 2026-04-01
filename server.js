@@ -744,6 +744,19 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
+  app.put('/api/classes/:id', requireAdmin, async (req, res) => {
+    const { title, instructor, date, time, duration, capacity, description } = req.body;
+    if (!title || !date || !time || !capacity) return res.status(400).json({ error: 'Missing required fields' });
+    try {
+      const { rowCount } = await pool.query(
+        `UPDATE classes SET title=$1, instructor=$2, date=$3, time=$4, duration=$5, capacity=$6, description=$7 WHERE id=$8`,
+        [title, instructor || 'Studio Instructor', date, time, parseInt(duration) || 60, parseInt(capacity), description || '', req.params.id]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: 'Class not found' });
+      res.json({ success: true, id: req.params.id, title, instructor, date, time, duration, capacity, description });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
   app.delete('/api/classes/:id', requireAdmin, async (req, res) => {
     try {
       const { rowCount } = await pool.query('DELETE FROM classes WHERE id = $1', [req.params.id]);
