@@ -216,7 +216,7 @@ async function loadClasses() {
     const dateStr = formatDate(cls.date);
     const opt = document.createElement('option');
     opt.value = cls.id;
-    opt.textContent = `${cls.title} — ${dateStr} at ${cls.time}${isFull ? ' (Full)' : ` (${spotsLeft} spots left)`}`;
+    opt.textContent = `${cls.title} — ${dateStr} at ${formatTime(cls.time)}${isFull ? ' (Full)' : ` (${spotsLeft} spots left)`}`;
     opt.disabled = isFull;
     if (isFull) opt.style.color = '#aaa';
     select.appendChild(opt);
@@ -254,12 +254,18 @@ function formatDate(dateStr) {
   return `${days[date.getDay()]}, ${months[parseInt(m)-1]} ${parseInt(d)}, ${y}`;
 }
 
+function formatTime(t) {
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
 function updateBanner(classId) {
   const cls = allClasses.find(c => c.id === classId);
   if (!cls) { document.getElementById('classBanner').style.display = 'none'; return; }
   const spotsLeft = cls.capacity - cls.registeredCount;
   document.getElementById('bannerTitle').textContent = cls.title;
-  document.getElementById('bannerMeta').textContent = `${formatDate(cls.date)} at ${cls.time} · ${cls.duration} min · ${cls.instructor} · ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} remaining`;
+  document.getElementById('bannerMeta').textContent = `${formatDate(cls.date)} at ${formatTime(cls.time)} · ${cls.duration} min · ${cls.instructor} · ${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} remaining`;
   document.getElementById('classBanner').style.display = 'flex';
 }
 

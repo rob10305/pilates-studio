@@ -470,7 +470,7 @@ function showClassesForDate(dateKey) {
           <span class="availability ${badgeCls}">${badge}</span>
         </div>
         <div class="class-item-meta">
-          <span>🕐 ${cls.time}</span><span>⏱ ${cls.duration} min</span><span>👤 ${esc(cls.instructor)}</span>
+          <span>🕐 ${formatTime(cls.time)}</span><span>⏱ ${cls.duration} min</span><span>👤 ${esc(cls.instructor)}</span>
         </div>
         ${cls.description ? `<p style="font-size:0.8rem;color:var(--mid);margin-top:0.5rem">${esc(cls.description)}</p>` : ''}
         ${!isFull ? `<div style="margin-top:0.75rem"><button class="btn btn-sage btn-sm" onclick="event.stopPropagation();window.location.href='register.html?classId=${cls.id}'">Book Now</button></div>` : '<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--light)">Class is fully booked</div>'}

@@ -140,6 +140,12 @@ function formatDateKey(date) {
   return `${y}-${m}-${d}`;
 }
 
+function formatTime(t) {
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
 function getClassesForDate(dateKey) {
   return allClasses.filter(c => c.date === dateKey);
 }
@@ -272,7 +278,7 @@ function showClassesForDate(dateKey) {
           <span class="availability ${badgeClass}">${badge}</span>
         </div>
         <div class="class-item-meta">
-          <span>🕐 ${cls.time}</span>
+          <span>🕐 ${formatTime(cls.time)}</span>
           <span>⏱ ${cls.duration} min</span>
           <span>👤 ${cls.instructor}</span>
         </div>

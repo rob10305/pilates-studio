@@ -298,6 +298,12 @@ async function loadDashboard() {
   }
 }
 
+function formatTime(t) {
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
 function formatDate(dateStr) {
   const [y, m, d] = dateStr.split('-');
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -325,7 +331,7 @@ function renderUpcomingClasses(classes, registrations) {
     <div class="admin-class-item">
       <div class="admin-class-info">
         <h4>${c.title}</h4>
-        <p>${formatDate(c.date)} at ${c.time} · ${c.instructor} · ${c.regCount}/${c.capacity} booked</p>
+        <p>${formatDate(c.date)} at ${formatTime(c.time)} · ${c.instructor} · ${c.regCount}/${c.capacity} booked</p>
       </div>
       <div style="display:flex;gap:0.4rem">
         <button style="background:#e3f2fd;color:#1565c0;border:none;padding:0.35rem 0.8rem;border-radius:6px;font-size:0.78rem;font-weight:700;cursor:pointer" onclick="editClass('${c.id}')">Edit</button>
@@ -622,7 +628,7 @@ function populateRosterSelect(classes, registrations) {
     const isPast = new Date(`${c.date}T${c.time}`) < now;
     const opt = document.createElement('option');
     opt.value = c.id;
-    opt.textContent = `${isPast ? '✓ ' : ''}${formatDate(c.date)} · ${c.time} · ${c.title} (${regCount}/${c.capacity})`;
+    opt.textContent = `${isPast ? '✓ ' : ''}${formatDate(c.date)} · ${formatTime(c.time)} · ${c.title} (${regCount}/${c.capacity})`;
     if (isPast) opt.style.color = '#999';
     select.appendChild(opt);
   });
