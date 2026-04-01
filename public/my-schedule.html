@@ -140,6 +140,9 @@
     @media (max-width: 560px) {
       .booking-card { flex-wrap: wrap; }
       .booking-actions { width: 100%; justify-content: flex-end; }
+      .no-bookings-msg { padding: 1rem 1rem 0.5rem; }
+      .no-bookings-msg .big-icon { font-size: 2rem; margin-bottom: 0.25rem; }
+      .my-schedule-wrap { padding-bottom: 1rem; }
     }
   </style>
 </head>
@@ -175,7 +178,7 @@
 </div>
 
 <!-- Calendar section — always shown below booked classes -->
-<div id="calendarSection" style="display:none" class="my-schedule-wrap">
+<div id="calendarSection" style="display:none;padding-top:0" class="my-schedule-wrap">
   <div class="section-heading calendar-section">📅 Available Classes — Book a Spot</div>
   <div class="schedule-layout" style="margin-top:1rem">
     <div>
@@ -426,7 +429,7 @@ function renderCalendar() {
       const dots = document.createElement('div'); dots.className = 'day-dots';
       dayClasses.forEach(c => { const dot = document.createElement('div'); dot.className = 'day-dot' + (c.registeredCount >= c.capacity ? ' full' : ''); dots.appendChild(dot); });
       el.appendChild(dots);
-      el.addEventListener('click', () => { selectedDate = dateKey; renderCalendar(); showClassesForDate(dateKey); });
+      el.addEventListener('click', () => { selectedDate = dateKey; renderCalendar(); showClassesForDate(dateKey); document.querySelector('.class-panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     }
     grid.appendChild(el);
   }
