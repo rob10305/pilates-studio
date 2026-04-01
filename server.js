@@ -1290,6 +1290,51 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
+  // Test email endpoint — sends a sample of any email type to a specified address
+  app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
+    const { emailType, testEmail } = req.body;
+    if (!testEmail) return res.status(400).json({ error: 'Please enter a test email address.' });
+    if (!process.env.RESEND_API_KEY) return res.status(400).json({ error: 'RESEND_API_KEY not configured — emails cannot be sent.' });
+
+    const sampleCls = { id: 'test', title: 'Mat Pilates', instructor: 'Amanda Stevens', date: '2026-04-09', time: '11:00', duration: 50, capacity: 12 };
+    const sampleRegId = 'test-' + Date.now();
+
+    try {
+      switch (emailType) {
+        case 'booking_confirmed':
+          await sendConfirmationEmail({ to: testEmail, firstName: 'Test', lastName: 'User', cls: sampleCls, registrationId: sampleRegId });
+          break;
+        case 'payment_confirmed':
+          await sendPaymentConfirmedEmail({ to: testEmail, firstName: 'Test', cls: sampleCls });
+          break;
+        case 'booking_cancelled':
+          await sendRemovalEmail({ to: testEmail, firstName: 'Test', cls: sampleCls });
+          break;
+        case 'class_reminder':
+          await sendReminderEmail({ to: testEmail, firstName: 'Test', cls: sampleCls, registrationId: sampleRegId });
+          break;
+        case 'payment_released':
+          await sendPaymentReleasedEmail({ to: testEmail, firstName: 'Test', cls: sampleCls });
+          break;
+        case 'waiver_signed':
+          await sendWaiverConfirmationEmail({ to: testEmail, firstName: 'Test', waiverId: 'test-waiver', signedAt: new Date().toISOString() });
+          break;
+        case 'new_booking_admin':
+          await sendNewBookingNotification({ notifyEmail: testEmail, registrant: { firstName: 'Test', lastName: 'User', email: 'test@example.com', phone: '555-0000' }, cls: sampleCls });
+          break;
+        case 'payment_alert_admin':
+          await sendAdminPaymentAlertEmail({ notifyEmail: testEmail, unpaidList: [{ reg: { id: sampleRegId, firstName: 'Test', lastName: 'User', email: 'test@example.com', phone: '555-0000', registeredAt: new Date().toISOString() }, cls: sampleCls }] });
+          break;
+        default:
+          return res.status(400).json({ error: 'Unknown email type.' });
+      }
+      res.json({ success: true });
+    } catch (e) {
+      console.error('Test email error:', e);
+      res.status(500).json({ error: e.message || 'Failed to send test email.' });
+    }
+  });
+
   // 6. Return app — caller decides whether to listen or export
   return app;
 }
