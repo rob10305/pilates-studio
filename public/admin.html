@@ -700,7 +700,7 @@ async function markPaid(regId) {
     loadRoster();
     const alert = document.getElementById('dashboardAlert');
     alert.className = 'alert alert-success';
-    alert.textContent = 'Payment marked as received.';
+    alert.textContent = 'Payment marked as received. A confirmation email has been sent to the user.';
     alert.style.display = 'block';
   }
 }

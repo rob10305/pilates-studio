@@ -898,6 +898,20 @@ async function createApp() {
         [req.params.id]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Registration not found' });
+
+      // Send payment confirmation email to the user
+      const { rows } = await pool.query(
+        `SELECT r."firstName", r.email, r."classId" FROM registrations r WHERE r.id = $1`,
+        [req.params.id]
+      );
+      if (rows.length > 0) {
+        const { rows: clsRows } = await pool.query('SELECT * FROM classes WHERE id = $1', [rows[0].classId]);
+        if (clsRows.length > 0) {
+          sendPaymentConfirmedEmail({ to: rows[0].email, firstName: rows[0].firstName, cls: clsRows[0] })
+            .catch(e => console.error('Payment confirmed email error:', e.message));
+        }
+      }
+
       res.json({ success: true });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
