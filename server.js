@@ -450,7 +450,8 @@ async function initDB() {
     ['1010','Mat Pilates','Amanda','2026-04-02','11:00',50,12,'Private Booking'],
     ['1011','Mat Pilates','Amanda','2026-04-09','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1012','Mat Pilates','Amanda','2026-04-16','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ['1013','Mat Pilates','Amanda','2026-04-23','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1013','Mat Pilates','Amanda','2026-04-23','08:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
+    ['1018','Mat Pilates','Amanda','2026-04-23','09:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1014','Mat Pilates','Amanda','2026-04-30','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1015','Mat Pilates','Amanda','2026-04-09','12:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1016','Mat Pilates','Amanda','2026-04-16','12:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
@@ -460,12 +461,12 @@ async function initDB() {
     await pool.query(`
       INSERT INTO classes (id,title,instructor,date,time,duration,capacity,description)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-      ON CONFLICT (id) DO UPDATE SET
-        title=EXCLUDED.title, instructor=EXCLUDED.instructor, date=EXCLUDED.date,
-        time=EXCLUDED.time, duration=EXCLUDED.duration, capacity=EXCLUDED.capacity,
-        description=EXCLUDED.description
+      ON CONFLICT (id) DO NOTHING
     `, row);
   }
+
+  // One-time fix: update class 1013 from 11:00 to 08:00
+  await pool.query(`UPDATE classes SET time='08:00' WHERE id='1013' AND time='11:00'`);
 
   // Make April 2 class appear full by inserting 12 placeholder registrations
   try {
