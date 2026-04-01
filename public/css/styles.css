@@ -747,7 +747,7 @@ footer .copyright { font-size: 0.8rem; color: rgba(255,255,255,0.4); border-top:
   /* Footer */
   footer { padding: 40px 4% 24px; }
   footer .footer-links { gap: 1rem; }
-  footer .nav-logo-img { height: 38px; padding: 3px 5px; }
+  footer .nav-logo-img { height: 76px; padding: 6px 10px; }
 
   /* Buttons — ensure 44px touch target */
   .btn { padding: 0.85rem 1.75rem; min-height: 44px; }
