@@ -85,64 +85,56 @@
     .waiver-card {
       background: #f0f9f0;
       border: 1px solid #c8e6c8;
-      border-radius: 12px;
-      padding: 1.5rem;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
       display: flex;
       align-items: center;
-      gap: 1rem;
-      margin-top: 2rem;
+      gap: 0.75rem;
     }
     .waiver-card.not-signed {
       background: #fef6f0;
       border-color: #f5d5b8;
     }
-    .waiver-icon {
-      font-size: 2.5rem;
-      flex-shrink: 0;
+    .waiver-info {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      flex: 1;
     }
-    .waiver-info h3 {
-      font-family: 'Playfair Display', serif;
-      font-size: 1.1rem;
+    .waiver-info .waiver-label {
+      font-size: 0.85rem;
+      font-weight: 700;
       color: #2e7d32;
-      margin-bottom: 0.25rem;
     }
-    .waiver-card.not-signed .waiver-info h3 {
+    .waiver-card.not-signed .waiver-label {
       color: #e65100;
     }
-    .waiver-info p {
-      font-size: 0.88rem;
+    .waiver-info .waiver-date {
+      font-size: 0.8rem;
       color: var(--mid);
-      margin-bottom: 0.75rem;
     }
     .waiver-download {
-      display: inline-block;
-      padding: 0.5rem 1.25rem;
-      border: 1.5px solid #2e7d32;
-      border-radius: 50px;
+      font-size: 0.78rem;
+      font-weight: 600;
       color: #2e7d32;
-      font-size: 0.85rem;
-      font-weight: 700;
       text-decoration: none;
-      transition: background 0.2s, color 0.2s;
+      margin-left: auto;
+      white-space: nowrap;
     }
     .waiver-download:hover {
-      background: #2e7d32;
-      color: #fff;
+      text-decoration: underline;
     }
     .waiver-sign-link {
-      display: inline-block;
-      padding: 0.5rem 1.25rem;
-      border: 1.5px solid #e65100;
-      border-radius: 50px;
+      font-size: 0.78rem;
+      font-weight: 600;
       color: #e65100;
-      font-size: 0.85rem;
-      font-weight: 700;
       text-decoration: none;
-      transition: background 0.2s, color 0.2s;
+      margin-left: auto;
+      white-space: nowrap;
     }
     .waiver-sign-link:hover {
-      background: #e65100;
-      color: #fff;
+      text-decoration: underline;
     }
 
     @media (max-width: 560px) {
@@ -182,11 +174,6 @@
   </div>
 </div>
 
-<!-- Waiver status -->
-<div class="my-schedule-wrap" style="padding-top:0">
-  <div id="waiverStatus"></div>
-</div>
-
 <!-- Calendar section — always shown below booked classes -->
 <div id="calendarSection" style="display:none" class="my-schedule-wrap">
   <div class="section-heading calendar-section">📅 Available Classes — Book a Spot</div>
@@ -215,6 +202,11 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Waiver status -->
+<div class="my-schedule-wrap" style="padding-top:0;padding-bottom:1.5rem">
+  <div id="waiverStatus"></div>
 </div>
 
 <footer>
@@ -322,21 +314,18 @@ async function loadWaiverStatus() {
       const signedDate = new Date(waiver.signed_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
       container.innerHTML = `
         <div class="waiver-card">
-          <div class="waiver-icon">✅</div>
           <div class="waiver-info">
-            <h3>You have already signed this waiver</h3>
-            <p>Signed on ${signedDate}</p>
-            <a href="${waiver.viewUrl}" target="_blank" class="waiver-download">Download My Signed Copy</a>
+            <span class="waiver-label">✓ Waiver Signed</span>
+            <span class="waiver-date">${signedDate}</span>
+            <a href="${waiver.viewUrl}" target="_blank" class="waiver-download">Download Copy</a>
           </div>
         </div>`;
     } else {
       container.innerHTML = `
         <div class="waiver-card not-signed">
-          <div class="waiver-icon">📋</div>
           <div class="waiver-info">
-            <h3>Waiver not yet signed</h3>
-            <p>Please sign the liability waiver before your first class.</p>
-            <a href="waiver.html" class="waiver-sign-link">Sign Waiver Now</a>
+            <span class="waiver-label">Waiver not signed</span>
+            <a href="waiver.html" class="waiver-sign-link">Sign Now</a>
           </div>
         </div>`;
     }
