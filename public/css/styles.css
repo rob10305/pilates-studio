@@ -530,7 +530,7 @@ section { padding: 80px 5%; }
 
 /* ===== Admin Page ===== */
 .admin-layout {
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 40px 5%;
 }
