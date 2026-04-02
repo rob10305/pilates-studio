@@ -90,6 +90,20 @@
         </div>
       </div>
 
+      <!-- Pending Payments (expanded by default) -->
+      <div class="admin-card" style="grid-column: 1 / -1" id="card-pending">
+        <div class="admin-card-header" onclick="toggleCard('card-pending')">
+          <h3>💳 Pending Payments</h3>
+          <span id="pendingCount" class="badge-count">0</span>
+          <span class="collapse-toggle">&#9660;</span>
+        </div>
+        <div class="admin-card-body">
+          <div id="pendingList">
+            <div class="empty-state"><p>Loading…</p></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Add / Edit Class (collapsed) -->
       <div class="admin-card collapsed" style="grid-column: 1 / -1" id="card-add-class">
         <div class="admin-card-header" onclick="toggleCard('card-add-class')">
@@ -308,6 +322,7 @@ async function loadDashboard() {
 
     renderUpcomingClasses(allClasses, registrations);
     renderRegistrations(registrations);
+    renderPendingPayments(allClasses, registrations);
     populateRosterSelect(allClasses, registrations);
     loadAdminUsers();
     loadSettings();
@@ -385,6 +400,93 @@ function renderRegistrations(registrations) {
       </div>
     </div>
   `).join('');
+}
+
+function renderPendingPayments(classes, registrations) {
+  const list = document.getElementById('pendingList');
+  const count = document.getElementById('pendingCount');
+
+  const pending = registrations
+    .filter(r => r.payment_status !== 'paid')
+    .map(r => {
+      const cls = classes.find(c => c.id === r.classId);
+      return { ...r, cls };
+    })
+    .sort((a, b) => new Date(a.registeredAt) - new Date(b.registeredAt));
+
+  count.textContent = pending.length;
+
+  if (pending.length === 0) {
+    list.innerHTML = '<div class="empty-state"><p>No pending payments — all bookings are paid! 🎉</p></div>';
+    return;
+  }
+
+  list.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+      <thead>
+        <tr style="border-bottom:2px solid var(--red);text-align:left">
+          <th style="padding:8px 12px">Name</th>
+          <th style="padding:8px 12px">Email</th>
+          <th style="padding:8px 12px">Phone</th>
+          <th style="padding:8px 12px">Class</th>
+          <th style="padding:8px 12px">Date</th>
+          <th style="padding:8px 12px">Registered</th>
+          <th style="padding:8px 12px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${pending.map(r => `
+          <tr style="border-bottom:1px solid #f0f0f0">
+            <td style="padding:10px 12px;font-weight:600">${r.firstName} ${r.lastName}</td>
+            <td style="padding:10px 12px"><a href="mailto:${r.email}" style="color:var(--red)">${r.email}</a></td>
+            <td style="padding:10px 12px;color:var(--mid)">${r.phone || '—'}</td>
+            <td style="padding:10px 12px;font-weight:600">${r.cls ? r.cls.title : '—'}</td>
+            <td style="padding:10px 12px;color:var(--mid);white-space:nowrap">${r.cls ? formatDate(r.cls.date) + ' ' + formatTime(r.cls.time) : '—'}</td>
+            <td style="padding:10px 12px;color:var(--mid);white-space:nowrap">${new Date(r.registeredAt).toLocaleDateString('en-CA')}</td>
+            <td style="padding:10px 12px;text-align:right;white-space:nowrap">
+              <div style="display:flex;gap:0.4rem;justify-content:flex-end">
+                <button style="background:#d4edda;color:#155724;border:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.78rem;font-weight:700;cursor:pointer"
+                  onclick="markPaidFromPending('${r.id}', '${r.firstName} ${r.lastName}')">Mark Paid</button>
+                <button class="btn-danger" style="font-size:0.78rem;padding:0.3rem 0.75rem"
+                  onclick="removePending('${r.id}', '${r.firstName} ${r.lastName}')">Remove</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <p style="margin-top:0.75rem;font-size:0.8rem;color:var(--mid)">${pending.length} pending payment${pending.length !== 1 ? 's' : ''} · Mark Paid sends a payment confirmation email · Remove sends a cancellation email.</p>`;
+}
+
+async function markPaidFromPending(regId, name) {
+  const res = await fetch(`/api/admin/registrations/${regId}/mark-paid`, { method: 'POST' });
+  if (res.ok) {
+    const alert = document.getElementById('dashboardAlert');
+    alert.className = 'alert alert-success';
+    alert.textContent = `Payment confirmed for ${name}. A confirmation email has been sent.`;
+    alert.style.display = 'block';
+    loadDashboard();
+  }
+}
+
+async function removePending(regId, name) {
+  if (!confirm(`Remove ${name}? They will be sent a cancellation email notifying them their spot has been released.`)) return;
+  const alert = document.getElementById('dashboardAlert');
+  const res = await fetch(`/api/admin/registrations/${regId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  if (res.ok) {
+    alert.className = 'alert alert-success';
+    alert.textContent = `${name} has been removed and notified by email.`;
+    alert.style.display = 'block';
+    loadDashboard();
+  } else {
+    const data = await res.json();
+    alert.className = 'alert alert-error';
+    alert.textContent = data.error || 'Failed to remove registration.';
+    alert.style.display = 'block';
+  }
 }
 
 async function addClass(e) {
