@@ -422,7 +422,8 @@ function renderPendingPayments(classes, registrations) {
   }
 
   list.innerHTML = `
-    <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:0.88rem;min-width:700px">
       <thead>
         <tr style="border-bottom:2px solid var(--red);text-align:left">
           <th style="padding:8px 12px">Name</th>
@@ -431,7 +432,7 @@ function renderPendingPayments(classes, registrations) {
           <th style="padding:8px 12px">Class</th>
           <th style="padding:8px 12px">Date</th>
           <th style="padding:8px 12px">Registered</th>
-          <th style="padding:8px 12px"></th>
+          <th style="padding:8px 12px;text-align:right">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -446,14 +447,15 @@ function renderPendingPayments(classes, registrations) {
             <td style="padding:10px 12px;text-align:right;white-space:nowrap">
               <div style="display:flex;gap:0.4rem;justify-content:flex-end">
                 <button style="background:#d4edda;color:#155724;border:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.78rem;font-weight:700;cursor:pointer"
-                  onclick="markPaidFromPending('${r.id}', '${r.firstName} ${r.lastName}')">Mark Paid</button>
+                  onclick="markPaidFromPending('${r.id}', '${r.firstName} ${r.lastName}')">✅ Mark Paid</button>
                 <button class="btn-danger" style="font-size:0.78rem;padding:0.3rem 0.75rem"
-                  onclick="removePending('${r.id}', '${r.firstName} ${r.lastName}')">Remove</button>
+                  onclick="removePending('${r.id}', '${r.firstName} ${r.lastName}')">❌ Remove</button>
               </div>
             </td>
           </tr>`).join('')}
       </tbody>
     </table>
+    </div>
     <p style="margin-top:0.75rem;font-size:0.8rem;color:var(--mid)">${pending.length} pending payment${pending.length !== 1 ? 's' : ''} · Mark Paid sends a payment confirmation email · Remove sends a cancellation email.</p>`;
 }
 
