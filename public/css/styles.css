@@ -676,23 +676,43 @@ footer .copyright { font-size: 0.8rem; color: rgba(255,255,255,0.4); border-top:
 /* Mobile */
 @media (max-width: 680px) {
 
-  /* Hide top nav entirely on mobile — bottom nav handles navigation */
+  /* Show simplified top nav on mobile */
   nav {
-    display: none !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 4%;
   }
-  .nav-toggle { display: none; }
+  .nav-logo { display: none; }
+  .nav-toggle { display: none !important; }
   .nav-links {
-    display: none !important;
+    display: flex !important;
+    position: static !important;
+    flex-direction: row !important;
+    gap: 0;
+    width: auto;
+    box-shadow: none;
+    border: none;
+    background: transparent;
   }
-  .nav-links li { width: 100%; }
+  /* Hide all nav items except Home, Schedule, My Account */
+  .nav-links li { display: none !important; }
+  .nav-links li:nth-child(1),
+  .nav-links li:nth-child(3) {
+    display: block !important;
+  }
+  /* My Schedule shown by JS when logged in — just ensure it's not hidden by our rule */
+  .nav-links li#myScheduleNav[style*="block"] {
+    display: block !important;
+  }
   .nav-links a {
     display: block;
-    padding: 0.9rem 5%;
-    font-size: 1rem;
-    border-bottom: 1px solid var(--border);
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    border-bottom: none;
     color: var(--charcoal);
+    font-weight: 600;
   }
-  .nav-links li:last-child a { border-bottom: none; }
   .nav-logo-img { height: 42px; }
 
   /* Hero */
