@@ -238,6 +238,140 @@
       border-radius: 3px;
       transition: width 0.3s ease;
     }
+
+    /* ===== Cart-style booking (shared look with schedule.html) ===== */
+    .schedule-right {
+      position: sticky;
+      top: 90px;
+      align-self: start;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .schedule-right .class-panel { position: static; }
+    .cart-panel {
+      background: var(--white);
+      border: 2px solid var(--red);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .cart-panel-header {
+      padding: 0.9rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: #fff8f8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .cart-panel-header h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1rem;
+      color: var(--charcoal);
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .cart-count-badge {
+      background: var(--red);
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 20px;
+      font-family: 'Lato', sans-serif;
+    }
+    .cart-clear-btn {
+      background: none;
+      border: none;
+      font-size: 0.78rem;
+      color: var(--mid);
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+    .cart-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .cart-item-info { flex: 1; min-width: 0; }
+    .cart-item-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--charcoal);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cart-item-meta { font-size: 0.76rem; color: var(--mid); margin-top: 0.15rem; }
+    .cart-remove-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      font-size: 0.65rem;
+      color: var(--mid);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      line-height: 1;
+      padding: 0;
+    }
+    .cart-remove-btn:hover { background: var(--red); color: #fff; border-color: var(--red); }
+    .cart-footer { padding: 0.9rem 1.25rem 1.1rem; }
+    .cart-summary { font-size: 0.8rem; color: var(--mid); margin-bottom: 0.75rem; line-height: 1.4; }
+    .cart-addmore {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.65rem;
+      margin: 0.85rem 0 0.25rem;
+      padding: 0.7rem 0.85rem;
+      background: #fff8f2;
+      border: 1px dashed var(--red);
+      border-radius: 8px;
+    }
+    .cart-addmore-icon { font-size: 1.1rem; line-height: 1.2; flex-shrink: 0; }
+    .cart-addmore-title { font-size: 0.85rem; font-weight: 700; color: var(--charcoal); margin: 0 0 0.2rem; }
+    .cart-addmore-sub { font-size: 0.78rem; color: var(--mid); margin: 0; line-height: 1.4; }
+    .btn-cart-checkout {
+      display: block;
+      width: 100%;
+      padding: 0.8rem;
+      background: var(--red);
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 0.93rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-cart-checkout:hover { opacity: 0.85; }
+    .btn-add-schedule {
+      background: var(--cream);
+      color: var(--charcoal);
+      border: 1.5px solid var(--border);
+      border-radius: 50px;
+      padding: 0.45rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+      font-family: 'Lato', sans-serif;
+    }
+    .btn-add-schedule:hover { border-color: var(--red); color: var(--red); }
+    .btn-add-schedule.in-cart { background: #e8f5e9; border-color: #81c784; color: #2e7d32; }
+    @media (max-width: 900px) {
+      .schedule-right { position: static; }
+    }
   </style>
 </head>
 <body>
@@ -291,18 +425,43 @@
         </div>
         <div class="calendar-grid" id="calGrid"></div>
       </div>
-      <div style="margin-top:1rem;display:flex;gap:1.5rem;padding:0 0.25rem;font-size:0.82rem;color:var(--mid)">
-        <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block"></span> Available</span>
-        <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--light);display:inline-block"></span> Full</span>
+      <div style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:1rem 1.5rem;padding:0 0.25rem;font-size:0.82rem;color:var(--mid)">
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:18px;height:14px;border-radius:3px;background:#fff2ef;border:1px solid var(--border);display:inline-block"></span> Date with classes</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block"></span> Each dot = 1 class</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:var(--light);display:inline-block"></span> Class full</span>
       </div>
     </div>
-    <div class="class-panel">
-      <div class="class-panel-header">
-        <h3 id="panelTitle">Select a Date</h3>
-        <p id="panelSubtitle">Click a highlighted date to view classes</p>
+
+    <!-- Right column: Class panel + multi-class cart (same UX as the Schedule page) -->
+    <div class="schedule-right">
+      <div class="class-panel">
+        <div class="class-panel-header">
+          <h3 id="panelTitle">Select a Date</h3>
+          <p id="panelSubtitle">Click a highlighted date to view classes</p>
+        </div>
+        <div class="class-list" id="classList">
+          <div class="empty-state"><div style="font-size:2.5rem">📅</div><p>Select a date on the calendar to view available classes.</p></div>
+        </div>
       </div>
-      <div class="class-list" id="classList">
-        <div class="empty-state"><div style="font-size:2.5rem">📅</div><p>Select a date on the calendar to view available classes.</p></div>
+
+      <!-- Cart panel — appears when the user adds one or more classes -->
+      <div class="cart-panel" id="cartPanel" style="display:none">
+        <div class="cart-panel-header">
+          <h3>Booking Cart <span class="cart-count-badge" id="cartCountBadge">0</span></h3>
+          <button class="cart-clear-btn" onclick="clearCart()">Clear all</button>
+        </div>
+        <div id="cartList"></div>
+        <div class="cart-addmore" id="cartAddMore" style="display:none">
+          <span class="cart-addmore-icon">📅</span>
+          <div>
+            <p class="cart-addmore-title">Want more classes?</p>
+            <p class="cart-addmore-sub" id="cartAddMoreSub">Add more classes from the calendar before checkout.</p>
+          </div>
+        </div>
+        <div class="cart-footer">
+          <p class="cart-summary" id="cartSummary"></p>
+          <button class="btn-cart-checkout" onclick="checkout()">Checkout &amp; Register →</button>
+        </div>
       </div>
     </div>
   </div>
@@ -652,8 +811,9 @@ function showClassesForDate(dateKey) {
     const isFew     = !isFull && spotsLeft <= 3;
     const badge     = isFull ? 'Full' : isFew ? `${spotsLeft} left` : `${spotsLeft} open`;
     const badgeCls  = isFull ? 'full-badge' : isFew ? 'few' : 'open';
+    const inCart    = cartItems.some(c => c.id === cls.id);
     return `
-      <div class="class-item${isFull ? ' full' : ''}" ${isFull ? '' : `onclick="window.location.href='register.html?classId=${cls.id}'"` } style="${isFull ? '' : 'cursor:pointer'}">
+      <div class="class-item${isFull ? ' full' : ''}">
         <div class="class-item-top">
           <div class="class-item-title">${esc(cls.title)}</div>
           <span class="availability ${badgeCls}">${badge}</span>
@@ -662,9 +822,90 @@ function showClassesForDate(dateKey) {
           <span>🕐 ${formatTime(cls.time)}</span><span>⏱ ${cls.duration} min</span><span>👤 ${esc(cls.instructor)}</span>
         </div>
         ${cls.description ? `<p style="font-size:0.8rem;color:var(--mid);margin-top:0.5rem">${esc(cls.description)}</p>` : ''}
-        ${!isFull ? `<div style="margin-top:0.75rem"><button class="btn btn-sage btn-sm" onclick="event.stopPropagation();window.location.href='register.html?classId=${cls.id}'">Book Now</button></div>` : '<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--light)">Class is fully booked</div>'}
+        ${!isFull
+          ? `<div style="margin-top:0.75rem"><button class="btn-add-schedule${inCart ? ' in-cart' : ''}" onclick="toggleCart('${cls.id}')">${inCart ? '✓ Added' : '+ Add to Schedule'}</button></div>`
+          : '<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--light)">Class is fully booked</div>'}
       </div>`;
   }).join('');
+}
+
+// ===== Cart (shared UX with schedule.html) =====
+let cartItems = [];
+
+function toggleCart(classId) {
+  const idx = cartItems.findIndex(c => c.id === classId);
+  if (idx >= 0) {
+    cartItems.splice(idx, 1);
+  } else {
+    const cls = allClasses.find(c => c.id === classId);
+    if (cls) cartItems.push(cls);
+  }
+  renderCart();
+  if (selectedDate) showClassesForDate(selectedDate);
+}
+
+function renderCart() {
+  const panel = document.getElementById('cartPanel');
+  const list = document.getElementById('cartList');
+  const badge = document.getElementById('cartCountBadge');
+  const summary = document.getElementById('cartSummary');
+  const addMore = document.getElementById('cartAddMore');
+  const addMoreSub = document.getElementById('cartAddMoreSub');
+
+  badge.textContent = cartItems.length;
+
+  if (cartItems.length === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'block';
+
+  const sorted = [...cartItems].sort((a, b) =>
+    new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`)
+  );
+  list.innerHTML = sorted.map(cls => `
+    <div class="cart-item">
+      <div class="cart-item-info">
+        <div class="cart-item-title">${esc(cls.title)}</div>
+        <div class="cart-item-meta">${formatDateShort(cls.date)} · ${formatTime(cls.time)}</div>
+      </div>
+      <button class="cart-remove-btn" onclick="toggleCart('${cls.id}')" title="Remove">✕</button>
+    </div>
+  `).join('');
+
+  if (addMore) {
+    addMore.style.display = 'flex';
+    addMoreSub.textContent = 'Add more classes from the calendar before checkout.';
+  }
+
+  const n = cartItems.length;
+  let summaryText;
+  if (n === 1) summaryText = `1 class selected · $25 CAD pay-per-class`;
+  else if (n < 4) summaryText = `${n} classes selected · $${n * 25} CAD pay-per-class`;
+  else if (n === 4) summaryText = `4 classes selected · $85 CAD (4-class bundle — save $15)`;
+  else             summaryText = `${n} classes selected · $${85 + (n - 4) * 25} CAD (bundle + ${n - 4} drop-in)`;
+  summary.textContent = summaryText;
+}
+
+function formatDateShort(dateStr) {
+  const [y, m, d] = dateStr.split('-');
+  const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${days[date.getDay()]} ${months[parseInt(m)-1]} ${parseInt(d)}`;
+}
+
+function clearCart() {
+  cartItems = [];
+  renderCart();
+  if (selectedDate) showClassesForDate(selectedDate);
+}
+
+async function checkout() {
+  if (cartItems.length === 0) return;
+  sessionStorage.setItem('scheduleCart', JSON.stringify(cartItems.map(c => c.id)));
+  // User is already logged in on this page — go straight to register
+  window.location.href = 'register.html';
 }
 
 document.getElementById('prevMonth').addEventListener('click', () => {
