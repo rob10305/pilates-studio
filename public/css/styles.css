@@ -351,9 +351,19 @@ section { padding: 80px 5%; }
 
 .cal-day.other-month { background: var(--cream); }
 .cal-day.today .day-num { background: var(--red); color: var(--white); border-radius: 50%; }
-.cal-day.has-class { cursor: pointer; }
-.cal-day.has-class:hover { background: #f5eded; }
-.cal-day.selected { background: #f0e8e7; }
+/* Days with classes — subtle warm background tint + red day number so they
+   stand out at a glance. Dots still show how many classes run that day. */
+.cal-day.has-class {
+  cursor: pointer;
+  background: #fff2ef;
+}
+.cal-day.has-class .day-num { color: var(--red); }
+.cal-day.has-class:hover { background: #ffe5df; }
+/* Today that also has a class — keep the red-circle day number styling */
+.cal-day.has-class.today .day-num { color: var(--white); }
+.cal-day.selected { background: #ffd6ce; outline: 2px solid var(--red); outline-offset: -2px; z-index: 1; }
+.cal-day.selected .day-num { color: var(--red); font-weight: 800; }
+.cal-day.selected.today .day-num { color: var(--white); }
 
 .day-num {
   font-size: 0.85rem;
