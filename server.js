@@ -405,6 +405,36 @@ function normalizeClarityData({ overview, geoDevice, pagesRefs }) {
   return out;
 }
 
+// Clean up orphaned artifacts left behind by past deletes that didn't fully
+// purge. Any row in the legacy tables whose email matches but whose user_id
+// is NULL is treated as a remnant of a previously-deleted account. Called
+// immediately before a new user is created so the fresh account starts on a
+// truly clean slate — important because email-linked lookups (my-schedule
+// bookings, waiver pre-fill, phone auto-populate, etc.) would otherwise
+// silently re-attach those orphaned rows to the new account.
+async function purgeOrphansByEmail(email) {
+  if (!email) return { registrations: 0, cancelled_registrations: 0, waivers: 0 };
+  const lower = email.toLowerCase();
+  const results = {};
+  const tables = [
+    ['registrations',           'LOWER(email) = $1 AND user_id IS NULL'],
+    ['cancelled_registrations', 'LOWER(email) = $1 AND user_id IS NULL'],
+    ['waivers',                 'LOWER(email) = $1 AND user_id IS NULL']
+  ];
+  for (const [table, where] of tables) {
+    try {
+      const { rowCount } = await pool.query(`DELETE FROM ${table} WHERE ${where}`, [lower]);
+      results[table] = rowCount;
+    } catch (e) {
+      console.error(`purgeOrphansByEmail(${table}):`, e.message);
+      results[table] = -1;
+    }
+  }
+  const any = Object.values(results).some(n => n > 0);
+  if (any) console.log(`[purgeOrphansByEmail] cleaned remnants for ${lower}:`, results);
+  return results;
+}
+
 // Copy a registration into the cancelled_registrations archive.
 // Call BEFORE deleting the registration row so class details are still joinable.
 // `cancelledBy` is a free-form label: 'user', 'admin', 'email-link', 'unpaid-release', 'user-deleted'.
@@ -985,6 +1015,9 @@ async function createApp() {
           if (!user.google_id) await pool.query('UPDATE users SET google_id = $1 WHERE id = $2', [profile.id, user.id]);
           return done(null, user);
         }
+        // Fresh account for this email — first wipe any orphan artifacts
+        // left behind by a previous (incomplete) deletion of this email
+        if (email) await purgeOrphansByEmail(email);
         const { rows: created } = await pool.query(
           'INSERT INTO users (email, google_id, first_name, last_name) VALUES ($1,$2,$3,$4) RETURNING *',
           [email ? email.toLowerCase() : null, profile.id, firstName, lastName]
@@ -1015,6 +1048,9 @@ async function createApp() {
           return done(null, user);
         }
         const insertEmail = email ? email.toLowerCase() : `fb_${profile.id}@noemail.local`;
+        // Fresh account for this email — first wipe any orphan artifacts
+        // left behind by a previous (incomplete) deletion of this email
+        if (email) await purgeOrphansByEmail(email);
         const { rows: created } = await pool.query(
           'INSERT INTO users (email, facebook_id, first_name, last_name) VALUES ($1,$2,$3,$4) RETURNING *',
           [insertEmail, profile.id, firstName, lastName]
@@ -1205,6 +1241,9 @@ async function createApp() {
     try {
       const { rows: existing } = await pool.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
       if (existing.length > 0) return res.status(409).json({ error: 'An account with that email already exists.' });
+      // Wipe any orphan records left behind by a previous (incomplete) delete
+      // for this email before the new account is created
+      await purgeOrphansByEmail(email);
       const hash = await bcrypt.hash(password, 12);
       const { rows } = await pool.query(
         'INSERT INTO users (email, password_hash, first_name, last_name) VALUES ($1,$2,$3,$4) RETURNING *',
@@ -1455,7 +1494,9 @@ async function createApp() {
               req.login(existing[0], err => err ? reject(err) : resolve())
             ).catch(() => {});
           } else {
-            // Brand new user — create account and log in
+            // Brand new user — wipe any orphan records tied to this email
+            // from a previous deleted account, then create account and log in
+            await purgeOrphansByEmail(email);
             const { rows: newUser } = await pool.query(
               'INSERT INTO users (email, password_hash, first_name, last_name) VALUES ($1,$2,$3,$4) RETURNING *',
               [email.toLowerCase(), hash, firstName.trim(), lastName.trim()]
@@ -1727,6 +1768,58 @@ async function createApp() {
       console.log(`[delete-user] purged user id=${userId} email=${email}:`, deleted);
       res.json({ success: true, purged: deleted });
     } catch (e) { console.error('delete-user error:', e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Admin: scan for orphaned by-email artifacts across all tables. Returns
+  // counts + a list of affected emails so the admin can see what leaked
+  // before the purge logic was added.
+  app.get('/api/admin/orphans/scan', requireAdmin, async (req, res) => {
+    try {
+      const [r1, r2, r3] = await Promise.all([
+        pool.query(`SELECT LOWER(email) AS email, COUNT(*)::int AS n FROM registrations WHERE user_id IS NULL GROUP BY 1 ORDER BY n DESC`),
+        pool.query(`SELECT LOWER(email) AS email, COUNT(*)::int AS n FROM cancelled_registrations WHERE user_id IS NULL GROUP BY 1 ORDER BY n DESC`),
+        pool.query(`SELECT LOWER(email) AS email, COUNT(*)::int AS n FROM waivers WHERE user_id IS NULL GROUP BY 1 ORDER BY n DESC`)
+      ]);
+      // Merge by email
+      const byEmail = new Map();
+      const add = (rows, key) => rows.forEach(r => {
+        if (!byEmail.has(r.email)) byEmail.set(r.email, { email: r.email, registrations: 0, cancelled_registrations: 0, waivers: 0 });
+        byEmail.get(r.email)[key] = r.n;
+      });
+      add(r1.rows, 'registrations');
+      add(r2.rows, 'cancelled_registrations');
+      add(r3.rows, 'waivers');
+      const list = [...byEmail.values()].sort((a, b) =>
+        (b.registrations + b.cancelled_registrations + b.waivers) -
+        (a.registrations + a.cancelled_registrations + a.waivers)
+      );
+      res.json({ orphansByEmail: list, totalEmails: list.length });
+    } catch (e) { console.error('orphan scan error:', e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Admin: wipe orphan rows for a specific email (or all orphans if no email)
+  app.post('/api/admin/orphans/purge', requireAdmin, async (req, res) => {
+    const { email } = req.body || {};
+    try {
+      if (email) {
+        const result = await purgeOrphansByEmail(email);
+        return res.json({ success: true, email: email.toLowerCase(), purged: result });
+      }
+      // No email = purge ALL orphans
+      const [r1, r2, r3] = await Promise.all([
+        pool.query('DELETE FROM registrations WHERE user_id IS NULL'),
+        pool.query('DELETE FROM cancelled_registrations WHERE user_id IS NULL'),
+        pool.query('DELETE FROM waivers WHERE user_id IS NULL')
+      ]);
+      res.json({
+        success: true,
+        purged: {
+          registrations: r1.rowCount,
+          cancelled_registrations: r2.rowCount,
+          waivers: r3.rowCount
+        }
+      });
+    } catch (e) { console.error('orphan purge error:', e); res.status(500).json({ error: 'Server error' }); }
   });
 
   // Admin: full booking history for a user (upcoming, past, cancelled, bundle summary)
