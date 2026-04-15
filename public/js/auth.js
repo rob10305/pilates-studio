@@ -93,3 +93,29 @@ window.safeReturnTo = function (raw, fallback) {
     });
   }, { passive: true });
 })();
+
+// ── FAQ section — injected above footer on every page ──
+(function () {
+  var footer = document.querySelector('footer');
+  if (!footer) return;
+  // Skip admin page
+  if (window.location.pathname.includes('admin.html')) return;
+  var faqs = [
+    { q: 'Do I need to bring my own mat?', a: 'Yes! Please bring your own pilates mat to every class. If you forget, let us know and we\'ll do our best to help.' },
+    { q: 'What should I wear?', a: 'Comfortable clothing you can move freely in — think leggings, fitted tops, and grip socks (optional but recommended).' },
+    { q: 'I\'m a complete beginner — is that okay?', a: 'Absolutely. Our classes are designed to be welcoming and suitable for all levels. Your instructor will offer modifications throughout.' },
+    { q: 'How do I cancel or reschedule?', a: 'You can cancel from your <a href="my-schedule.html" style="color:var(--red)">My Account</a> page or via the link in your confirmation email. Cancellations more than 24 hours before class are fully refundable.' },
+    { q: 'Where is the studio located?', a: '43 Main Street South, Suite 2B, Campbellville, ON. Free parking is available on site.' },
+  ];
+  var faqHtml = '<section class="faq-section">' +
+    '<h2 style="font-family:\'Playfair Display\',Georgia,serif;font-size:1.6rem;text-align:center;margin-bottom:2rem;color:var(--charcoal)">Frequently Asked Questions</h2>' +
+    '<div class="faq-list">' +
+    faqs.map(function (f, i) {
+      return '<details class="faq-item">' +
+        '<summary class="faq-q">' + f.q + '</summary>' +
+        '<p class="faq-a">' + f.a + '</p>' +
+        '</details>';
+    }).join('') +
+    '</div></section>';
+  footer.insertAdjacentHTML('beforebegin', faqHtml);
+})();
