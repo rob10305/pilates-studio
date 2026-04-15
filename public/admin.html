@@ -40,6 +40,22 @@
       transition: none;
     }
     .admin-card.collapsed .admin-card-body { display: none; }
+
+    /* Multi-date picker */
+    .dp-wrap { background:var(--cream);border:1px solid var(--border);border-radius:8px;padding:0.75rem;max-width:300px }
+    .dp-nav { display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem }
+    .dp-nav-btn { background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:1.1rem;color:var(--charcoal);display:flex;align-items:center;justify-content:center;line-height:1 }
+    .dp-nav-btn:hover { background:var(--white) }
+    .dp-month-label { font-weight:700;font-size:0.88rem;color:var(--charcoal) }
+    .dp-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:2px }
+    .dp-day-hdr { text-align:center;font-size:0.7rem;font-weight:700;color:var(--mid);padding:3px 0 }
+    .dp-cell { text-align:center;padding:5px 2px;border-radius:5px;font-size:0.8rem;cursor:pointer;transition:background 0.1s;min-height:26px;display:flex;align-items:center;justify-content:center }
+    .dp-cell:hover:not(.dp-past) { background:rgba(130,0,0,0.1) }
+    .dp-cell.dp-past { color:#ccc;cursor:default }
+    .dp-cell.dp-selected { background:var(--red);color:#fff;font-weight:700 }
+    .dp-chips { display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.6rem;min-height:1.5rem }
+    .dp-chip { display:inline-flex;align-items:center;gap:0.3rem;background:var(--red);color:#fff;padding:0.22rem 0.55rem;border-radius:20px;font-size:0.76rem;font-weight:600 }
+    .dp-chip button { background:none;border:none;color:#fff;cursor:pointer;font-size:1rem;line-height:1;padding:0;margin-left:1px }
   </style>
 </head>
 <body>
@@ -130,15 +146,24 @@
                 <input type="text" id="newInstructor" value="Amanda Stevens">
               </div>
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="newDate">Date *</label>
-                <input type="date" id="newDate" required>
+            <!-- Multi-date picker (add mode) -->
+            <div class="form-group" id="datePickerGroup">
+              <label>Dates * <span style="font-size:0.78rem;font-weight:400;color:var(--mid)">— click to select one or more</span></label>
+              <div class="dp-wrap">
+                <div id="multiDatePicker"></div>
               </div>
-              <div class="form-group">
-                <label for="newTime">Time *</label>
-                <input type="time" id="newTime" required>
+              <div class="dp-chips" id="selectedDateChips">
+                <span style="font-size:0.82rem;color:var(--mid)">No dates selected</span>
               </div>
+            </div>
+            <!-- Single date input (edit mode only) -->
+            <div class="form-group" id="singleDateGroup" style="display:none">
+              <label for="newDate">Date *</label>
+              <input type="date" id="newDate">
+            </div>
+            <div class="form-group">
+              <label for="newTime">Time *</label>
+              <input type="time" id="newTime" required>
             </div>
             <div class="form-row">
               <div class="form-group">
@@ -490,6 +515,66 @@ async function removePending(regId, name) {
   }
 }
 
+// ── Multi-date picker ──────────────────────────────────────────
+let selectedDates = new Set();
+let pickerMonth = (() => { const d = new Date(); d.setDate(1); return d; })();
+const DP_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DP_DAYS   = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function renderDatePicker() {
+  const container = document.getElementById('multiDatePicker');
+  if (!container) return;
+  const year  = pickerMonth.getFullYear();
+  const month = pickerMonth.getMonth();
+  const firstDay    = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  const headers = DP_DAYS.map(d => `<div class="dp-day-hdr">${d}</div>`).join('');
+  let cells = Array(firstDay).fill('<div></div>').join('');
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isPast = new Date(year, month, d) < today;
+    const isSel  = selectedDates.has(ds);
+    cells += `<div class="dp-cell${isPast ? ' dp-past' : ''}${isSel ? ' dp-selected' : ''}"
+      ${!isPast ? `onclick="togglePickerDate('${ds}')"` : ''}>${d}</div>`;
+  }
+  container.innerHTML = `
+    <div class="dp-nav">
+      <button type="button" class="dp-nav-btn" onclick="shiftPickerMonth(-1)">&#8249;</button>
+      <span class="dp-month-label">${DP_MONTHS[month]} ${year}</span>
+      <button type="button" class="dp-nav-btn" onclick="shiftPickerMonth(1)">&#8250;</button>
+    </div>
+    <div class="dp-grid">${headers}${cells}</div>`;
+  renderDateChips();
+}
+
+function shiftPickerMonth(delta) {
+  pickerMonth.setMonth(pickerMonth.getMonth() + delta);
+  renderDatePicker();
+}
+
+function togglePickerDate(ds) {
+  selectedDates.has(ds) ? selectedDates.delete(ds) : selectedDates.add(ds);
+  renderDatePicker();
+}
+
+function renderDateChips() {
+  const el = document.getElementById('selectedDateChips');
+  if (!el) return;
+  if (!selectedDates.size) {
+    el.innerHTML = '<span style="font-size:0.82rem;color:var(--mid)">No dates selected</span>';
+    return;
+  }
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  el.innerHTML = [...selectedDates].sort().map(ds => {
+    const [y,m,d] = ds.split('-');
+    return `<span class="dp-chip">${mo[parseInt(m)-1]} ${parseInt(d)}, ${y}
+      <button type="button" onclick="togglePickerDate('${ds}')">×</button></span>`;
+  }).join('');
+}
+// ───────────────────────────────────────────────────────────────
+
 async function addClass(e) {
   e.preventDefault();
   const alert = document.getElementById('dashboardAlert');
@@ -506,10 +591,9 @@ async function addClass(e) {
     return;
   }
 
-  const body = {
+  const baseBody = {
     title,
     instructor: document.getElementById('newInstructor').value.trim() || 'Studio Instructor',
-    date: document.getElementById('newDate').value,
     time: document.getElementById('newTime').value,
     duration: parseInt(document.getElementById('newDuration').value) || 60,
     capacity: parseInt(document.getElementById('newCapacity').value),
@@ -517,39 +601,51 @@ async function addClass(e) {
   };
 
   const btn = document.getElementById('addBtn');
-  btn.textContent = isEdit ? 'Saving...' : 'Adding...';
   btn.disabled = true;
 
   try {
-    const url = isEdit ? `/api/classes/${editId}` : '/api/classes';
-    const method = isEdit ? 'PUT' : 'POST';
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    const data = await res.json();
-
-    if (res.ok) {
-      alert.className = 'alert alert-success';
-      alert.textContent = isEdit ? `Class "${data.title}" updated!` : `Class "${data.title}" added successfully!`;
+    if (isEdit) {
+      btn.textContent = 'Saving...';
+      const res = await fetch(`/api/classes/${editId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...baseBody, date: document.getElementById('newDate').value })
+      });
+      const data = await res.json();
+      alert.className = res.ok ? 'alert alert-success' : 'alert alert-error';
+      alert.textContent = res.ok ? `Class "${data.title}" updated!` : (data.error || 'Failed to update class.');
       alert.style.display = 'block';
-      if (isEdit) {
-        cancelEdit();
-      } else {
-        // Only reset date and time — keep instructor, duration, capacity, location
-        document.getElementById('newTitle').value = '';
-        document.getElementById('newDate').value = new Date().toISOString().split('T')[0];
-        document.getElementById('newTime').value = '';
-        document.getElementById('newDescription').value = '';
-      }
-      loadDashboard();
+      if (res.ok) cancelEdit();
     } else {
-      alert.className = 'alert alert-error';
-      alert.textContent = data.error || (isEdit ? 'Failed to update class.' : 'Failed to add class.');
+      if (!selectedDates.size) {
+        alert.className = 'alert alert-error';
+        alert.textContent = 'Please select at least one date on the calendar.';
+        alert.style.display = 'block';
+        return;
+      }
+      btn.textContent = 'Adding...';
+      const dates = [...selectedDates].sort();
+      let added = 0, failed = 0;
+      for (const date of dates) {
+        const res = await fetch('/api/classes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...baseBody, date })
+        });
+        if (res.ok) added++; else failed++;
+      }
+      alert.className = failed === 0 ? 'alert alert-success' : 'alert alert-error';
+      alert.textContent = failed === 0
+        ? `${added} class${added !== 1 ? 'es' : ''} added successfully!`
+        : `${added} added, ${failed} failed — please try again.`;
       alert.style.display = 'block';
+      document.getElementById('newTitle').value = '';
+      document.getElementById('newTime').value = '';
+      document.getElementById('newDescription').value = '';
+      selectedDates.clear();
+      renderDatePicker();
     }
+    loadDashboard();
   } catch {
     alert.className = 'alert alert-error';
     alert.textContent = 'Network error. Please try again.';
@@ -578,6 +674,10 @@ function editClass(classId) {
   document.getElementById('newCapacity').value = cls.capacity;
   document.getElementById('newDescription').value = cls.description || '';
 
+  // Switch date UI: hide picker, show single input
+  document.getElementById('datePickerGroup').style.display = 'none';
+  document.getElementById('singleDateGroup').style.display = '';
+
   // Update UI
   document.getElementById('classFormTitle').textContent = '✏️ Edit Class';
   document.getElementById('addBtn').textContent = 'Save Changes';
@@ -592,6 +692,12 @@ function cancelEdit() {
   document.getElementById('classFormTitle').textContent = '➕ Add New Class';
   document.getElementById('addBtn').textContent = 'Add Class';
   document.getElementById('cancelEditBtn').style.display = 'none';
+
+  // Restore multi-date picker, hide single input
+  document.getElementById('datePickerGroup').style.display = '';
+  document.getElementById('singleDateGroup').style.display = 'none';
+  selectedDates.clear();
+  renderDatePicker();
 
   // Reset to defaults
   document.getElementById('newTitle').value = '';
@@ -999,7 +1105,7 @@ async function sendTestEmail(emailType) {
   setTimeout(() => { alert.style.display = 'none'; }, 5000);
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => { init(); renderDatePicker(); });
 </script>
 <script>
   // Load Google Places API — only activates if API key is configured
