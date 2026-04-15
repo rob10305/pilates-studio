@@ -161,7 +161,10 @@
           </div>
           <div class="form-group" id="confirmPwGroup" style="display:none;margin-bottom:0">
             <label for="newPasswordConfirm" style="font-size:0.85rem">Confirm Password</label>
-            <input type="password" id="newPasswordConfirm" placeholder="Repeat your password" autocomplete="new-password">
+            <input type="password" id="newPasswordConfirm" placeholder="Repeat your password" autocomplete="new-password" oninput="handleConfirmInput()">
+            <div id="pwMatchError" style="display:none;background:#fce4ec;border:1.5px solid #c62828;color:#c62828;border-radius:6px;padding:0.6rem 0.85rem;margin-top:0.6rem;font-size:0.88rem;font-weight:600;line-height:1.4">
+              ⚠ Passwords do not match. Please re-enter them.
+            </div>
           </div>
         </div>
       </div>
@@ -398,6 +401,16 @@ document.getElementById('classSelect').addEventListener('change', function() {
 function handlePasswordInput() {
   const pw = document.getElementById('newPassword').value;
   document.getElementById('confirmPwGroup').style.display = pw.length > 0 ? 'block' : 'none';
+  // If they're changing the password, hide any stale mismatch error
+  const err = document.getElementById('pwMatchError');
+  if (err) err.style.display = 'none';
+}
+
+function handleConfirmInput() {
+  const pw = document.getElementById('newPassword').value;
+  const pc = document.getElementById('newPasswordConfirm').value;
+  const err = document.getElementById('pwMatchError');
+  if (err && pw === pc) err.style.display = 'none';
 }
 
 async function submitForm(e) {
@@ -537,9 +550,16 @@ async function doSubmit(packageType) {
       return;
     }
     if (password !== pwConfVal) {
-      alertBox.className = 'alert alert-error';
-      alertBox.textContent = 'Passwords do not match. Please try again.';
-      alertBox.style.display = 'block';
+      const inlineErr = document.getElementById('pwMatchError');
+      if (inlineErr) {
+        inlineErr.style.display = 'block';
+        document.getElementById('newPasswordConfirm').focus();
+        inlineErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        alertBox.className = 'alert alert-error';
+        alertBox.textContent = 'Passwords do not match. Please try again.';
+        alertBox.style.display = 'block';
+      }
       return;
     }
   }

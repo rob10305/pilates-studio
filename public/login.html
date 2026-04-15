@@ -119,6 +119,9 @@
         <label for="passwordConfirm">Confirm Password *</label>
         <input type="password" id="passwordConfirm" placeholder="········" autocomplete="new-password">
         <p id="passwordMatchHint" style="display:none;font-size:0.8rem;color:#c62828;margin-top:0.35rem">Passwords do not match</p>
+        <div id="passwordMatchError" style="display:none;background:#fce4ec;border:1.5px solid #c62828;color:#c62828;border-radius:6px;padding:0.6rem 0.85rem;margin-top:0.6rem;font-size:0.9rem;font-weight:600;line-height:1.4">
+          ⚠ Passwords do not match. Please re-enter them.
+        </div>
       </div>
 
       <p style="text-align:right;margin:-0.5rem 0 1rem" id="forgotPwRow">
@@ -224,6 +227,7 @@ function setMode(newMode) {
 
   document.getElementById('password').autocomplete = isCreate ? 'new-password' : 'current-password';
   document.getElementById('passwordMatchHint').style.display = 'none';
+  document.getElementById('passwordMatchError').style.display = 'none';
   document.getElementById('passwordConfirm').value = '';
   document.getElementById('alertBox').style.display = 'none';
 }
@@ -233,9 +237,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const pw = document.getElementById('password');
   const pc = document.getElementById('passwordConfirm');
   const hint = document.getElementById('passwordMatchHint');
+  const inlineErr = document.getElementById('passwordMatchError');
   function checkMatch() {
     if (mode !== 'create' || !pc.value) { hint.style.display = 'none'; return; }
-    hint.style.display = (pw.value === pc.value) ? 'none' : 'block';
+    const match = pw.value === pc.value;
+    hint.style.display = match ? 'none' : 'block';
+    // Hide the big inline error as soon as the user starts correcting — the
+    // small live hint picks up where it left off
+    if (match) inlineErr.style.display = 'none';
   }
   pw.addEventListener('input', checkMatch);
   pc.addEventListener('input', checkMatch);
@@ -255,7 +264,13 @@ async function submitAuth(e) {
     const passwordConfirm = document.getElementById('passwordConfirm').value;
     if (!firstName || !lastName)        return showAlert('Please enter your first and last name.', 'error');
     if (password.length < 8)            return showAlert('Password must be at least 8 characters.', 'error');
-    if (password !== passwordConfirm)   return showAlert('Passwords do not match. Please re-enter them.', 'error');
+    if (password !== passwordConfirm) {
+      const inlineErr = document.getElementById('passwordMatchError');
+      inlineErr.style.display = 'block';
+      document.getElementById('passwordConfirm').focus();
+      inlineErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
 
     setLoading(true, 'Creating account...');
     try {
