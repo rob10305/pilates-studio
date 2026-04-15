@@ -62,6 +62,16 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
+// Short non-reversible tag for logs. Lets us correlate events for the same
+// user across log lines without spilling raw email addresses into Vercel's
+// log storage (which retains them indefinitely and shows up in support
+// screenshots etc.). 8 hex chars = 32 bits — plenty for correlation, not
+// enough to meaningfully brute-force back to the email.
+function hashForLog(value) {
+  if (!value) return 'none';
+  return crypto.createHash('sha256').update(String(value)).digest('hex').slice(0, 8);
+}
+
 function cancelToken(registrationId) {
   return crypto.createHmac('sha256', process.env.SESSION_SECRET)
     .update(String(registrationId)).digest('hex');
@@ -1575,11 +1585,11 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
         [trimmedEmail]
       );
       if (!rows.length) {
-        console.log(`[forgot-password] No user found for email "${trimmedEmail}" — silently returning success.`);
+        console.log(`[forgot-password] No user for email-hash=${hashForLog(trimmedEmail)} — returning success silently.`);
       } else {
         const user = rows[0];
         if (!user.password_hash) {
-          console.log(`[forgot-password] User ${user.email} (id=${user.id}) has no password_hash (social login only) — skipping email.`);
+          console.log(`[forgot-password] user id=${user.id} (email-hash=${hashForLog(user.email)}) has no password_hash (social login only) — skipping.`);
         } else {
           // Invalidate any prior unused tokens for this user
           await pool.query(
@@ -1595,13 +1605,13 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
             [tokenHash, user.id, expires]
           );
           const resetUrl = `${APP_URL}/reset-password.html?token=${token}`;
-          console.log(`[forgot-password] Sending reset email to ${user.email} (id=${user.id}). RESEND_API_KEY present: ${!!process.env.RESEND_API_KEY}`);
+          console.log(`[forgot-password] sending reset email to user id=${user.id} (email-hash=${hashForLog(user.email)}); RESEND_API_KEY present=${!!process.env.RESEND_API_KEY}`);
           // Await so we can surface Resend errors in the response logs immediately
           try {
             const result = await sendPasswordResetEmail({ to: user.email, firstName: user.first_name, resetUrl });
-            console.log(`[forgot-password] Resend result for ${user.email}:`, JSON.stringify(result));
+            console.log(`[forgot-password] Resend OK user id=${user.id} messageId=${result?.data?.id || 'n/a'}`);
           } catch (e) {
-            console.error(`[forgot-password] Resend error for ${user.email}:`, e?.message, e?.response?.body || '');
+            console.error(`[forgot-password] Resend error user id=${user.id}:`, e?.message);
           }
         }
       }
@@ -1648,6 +1658,125 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
       if (err) return next(err);
       res.json({ success: true });
     });
+  });
+
+  // --- Self-serve data-subject endpoints (PIPEDA right of access + correction/deletion) ---
+
+  // Export every row we hold for the signed-in user as a single JSON download.
+  // This covers the user record (minus password_hash), every registration past
+  // and present (live + cancelled_registrations archive), signed waiver(s), and
+  // class-credit balance. Matches the admin purge cascade so users can verify
+  // there's nothing we'd fail to delete if they later hit DELETE /api/me.
+  app.get('/api/me/export', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not signed in.' });
+    const userId = req.user.id;
+    try {
+      const { rows: userRows } = await pool.query(
+        `SELECT id, email, first_name, last_name, phone, is_admin, created_at
+         FROM users WHERE id = $1`, [userId]);
+      if (!userRows.length) return res.status(404).json({ error: 'User not found.' });
+      const user = userRows[0];
+
+      const [regs, cancelled, waivers, credits] = await Promise.all([
+        pool.query(
+          `SELECT r.*, c.title AS class_title, c.date AS class_date, c.time AS class_time
+           FROM registrations r LEFT JOIN classes c ON c.id = r."classId"
+           WHERE r.user_id = $1 OR LOWER(r.email) = LOWER($2)`,
+          [userId, user.email]),
+        pool.query(
+          `SELECT * FROM cancelled_registrations
+           WHERE user_id = $1 OR LOWER(email) = LOWER($2)`,
+          [userId, user.email]),
+        pool.query(
+          `SELECT * FROM waivers
+           WHERE user_id = $1 OR LOWER(email) = LOWER($2)`,
+          [userId, user.email]),
+        pool.query(`SELECT balance FROM user_credits WHERE user_id = $1`, [userId])
+      ]);
+
+      const payload = {
+        exported_at: new Date().toISOString(),
+        note: 'This is every record Red Maple Movement holds about your account. Keep this file private — it contains your signed waiver and booking history.',
+        user,
+        credit_balance: credits.rows.length ? credits.rows[0].balance : 0,
+        registrations: regs.rows,
+        cancelled_registrations: cancelled.rows,
+        waivers: waivers.rows
+      };
+
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition',
+        `attachment; filename="rmm-my-data-${userId}-${Date.now()}.json"`);
+      res.send(JSON.stringify(payload, null, 2));
+    } catch (e) {
+      console.error('[me/export] error for user id=' + userId + ':', e.message);
+      res.status(500).json({ error: 'Could not export your data. Please email amanda@redmaplemovement.ca.' });
+    }
+  });
+
+  // Permanently delete the signed-in user's account and every row keyed by
+  // either their user_id or their email. Mirrors the admin /api/admin/users/:id
+  // cascade so the self-serve path leaves exactly the same amount of data
+  // behind (none).
+  //
+  // Safety: refuses if the caller is an admin — an admin self-delete would
+  // risk nobody being left to manage the studio. The admin must ask another
+  // admin to delete them via the admin dashboard.
+  app.delete('/api/me', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not signed in.' });
+    const userId = req.user.id;
+    if (req.user.is_admin) {
+      return res.status(400).json({
+        error: 'Admin accounts must be deleted from the admin dashboard by another admin.'
+      });
+    }
+    try {
+      const { rows: userRows } = await pool.query(
+        'SELECT email FROM users WHERE id = $1', [userId]);
+      if (!userRows.length) return res.status(404).json({ error: 'Account not found.' });
+      const email = userRows[0].email;
+
+      const deleted = {};
+      const del = async (label, q, params) => {
+        const { rowCount } = await pool.query(q, params);
+        deleted[label] = rowCount;
+      };
+
+      await del('registrations',
+        'DELETE FROM registrations WHERE user_id = $1 OR LOWER(email) = LOWER($2)',
+        [userId, email]);
+      await del('cancelled_registrations',
+        'DELETE FROM cancelled_registrations WHERE user_id = $1 OR LOWER(email) = LOWER($2)',
+        [userId, email]);
+      await del('waivers',
+        'DELETE FROM waivers WHERE user_id = $1 OR LOWER(email) = LOWER($2)',
+        [userId, email]);
+      await del('password_resets',
+        'DELETE FROM password_resets WHERE user_id = $1',
+        [userId]);
+      // Kill any active login sessions on other devices
+      await del('user_sessions',
+        `DELETE FROM user_sessions WHERE sess::jsonb -> 'passport' ->> 'user' = $1`,
+        [String(userId)]);
+      // Finally the user row itself (user_credits cascades via FK)
+      await del('users', 'DELETE FROM users WHERE id = $1', [userId]);
+
+      console.log(`[me/delete] self-purged user id=${userId} email-hash=${hashForLog(email)}:`, deleted);
+
+      // End the current session too
+      req.logout(err => {
+        if (err) {
+          // The rows are already gone — just tell the client it worked even
+          // if logout had a glitch. The next request to any authenticated
+          // endpoint will 401 because the user row no longer exists.
+          return res.json({ success: true, purged: deleted });
+        }
+        res.json({ success: true, purged: deleted });
+      });
+    } catch (e) {
+      console.error('[me/delete] error for user id=' + userId + ':', e.message);
+      res.status(500).json({ error: 'Could not delete account. Please email amanda@redmaplemovement.ca.' });
+    }
   });
 
   app.get('/auth/google', (req, res, next) => {
@@ -2193,7 +2322,7 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
       // Finally the user row itself (user_credits cascades via FK)
       await del('users', 'DELETE FROM users WHERE id = $1', [userId]);
 
-      console.log(`[delete-user] purged user id=${userId} email=${email}:`, deleted);
+      console.log(`[delete-user] purged user id=${userId} email-hash=${hashForLog(email)}:`, deleted);
       res.json({ success: true, purged: deleted });
     } catch (e) { console.error('delete-user error:', e); res.status(500).json({ error: 'Server error' }); }
   });
@@ -2696,7 +2825,7 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
           ids.push(row.id);
           sent++;
         } catch (e) {
-          console.error(`Reminder failed for ${row.email}:`, e.message);
+          console.error(`Reminder failed for registration id=${row.id} (email-hash=${hashForLog(row.email)}):`, e.message);
         }
       }
       if (ids.length) {
