@@ -742,6 +742,22 @@ async function createApp() {
     });
   });
 
+  // Public site config — safe to expose to all visitors. Used by the client-side
+  // analytics loader to conditionally inject third-party trackers (Microsoft
+  // Clarity, etc.) based on admin-configured settings.
+  app.get('/api/public-config', async (req, res) => {
+    try {
+      const clarityProjectId = (await getSetting('clarity_project_id')) || '';
+      // Short cache — propagate changes within a minute but keep the response
+      // cheap for repeat visitors.
+      res.set('Cache-Control', 'public, max-age=60');
+      res.json({ clarityProjectId });
+    } catch (e) {
+      console.error('public-config error:', e);
+      res.json({ clarityProjectId: '' });
+    }
+  });
+
   app.get('/auth/me', (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ user: null });
     const { id, email, first_name, last_name, is_admin } = req.user;
