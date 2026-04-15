@@ -351,7 +351,7 @@ async function sendReminderEmail({ to, firstName, cls, registrationId }) {
       body:
         `<p style="font-size:14px;color:#3a3a3a;margin:0 0 10px">
            <strong>A few things to bring:</strong> comfortable clothing you can move in, a water bottle,
-           and an open mindset. Mats are provided.
+           and an open mindset. Don't forget to bring your pilates mat!
          </p>
          <p style="font-size:13px;color:#6b6b6b;margin:0 0 8px">Running late or can't make it? <a href="${cancelUrl}" style="color:#820000">Cancel your booking</a> so the spot can go to someone else (cancellations more than 24 hours ahead are fully refundable — see our <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>).</p>
          <p style="font-size:13px;color:#3a3a3a;margin:0">See you on the mat! 🤍</p>`,
