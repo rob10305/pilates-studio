@@ -2427,7 +2427,16 @@ async function deleteClass(classId) {
 }
 
 async function deleteUser(userId, name, email) {
-  if (!confirm(`Delete user "${name}" (${email})?\n\nThis will permanently remove their account and all their registrations. This cannot be undone.`)) return;
+  const confirmMsg =
+    `Permanently delete "${name}" (${email})?\n\n` +
+    `This removes ALL traces of this user, including:\n` +
+    `  • Their account and credits\n` +
+    `  • Every current and past booking\n` +
+    `  • Every cancelled booking on record\n` +
+    `  • Their signed waiver\n` +
+    `  • Any active login sessions\n\n` +
+    `This cannot be undone.`;
+  if (!confirm(confirmMsg)) return;
   const alert = document.getElementById('dashboardAlert');
   const res = await fetch(`/api/admin/users/${userId}`, {
     method: 'DELETE',
@@ -2435,8 +2444,15 @@ async function deleteUser(userId, name, email) {
     body: JSON.stringify({})
   });
   if (res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const p = data.purged || {};
+    const parts = [];
+    if (p.registrations)           parts.push(`${p.registrations} booking${p.registrations === 1 ? '' : 's'}`);
+    if (p.cancelled_registrations) parts.push(`${p.cancelled_registrations} cancelled booking${p.cancelled_registrations === 1 ? '' : 's'}`);
+    if (p.waivers)                 parts.push(`${p.waivers} waiver${p.waivers === 1 ? '' : 's'}`);
+    const detail = parts.length ? ` (purged ${parts.join(', ')})` : '';
     alert.className = 'alert alert-success';
-    alert.textContent = `User "${name}" has been deleted.`;
+    alert.textContent = `User "${name}" permanently deleted${detail}.`;
     alert.style.display = 'block';
     loadDashboard();
   } else {

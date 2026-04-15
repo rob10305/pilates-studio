@@ -1679,14 +1679,54 @@ async function createApp() {
       if (req.user && String(req.user.id) === String(userId)) {
         return res.status(400).json({ error: 'You cannot delete your own account.' });
       }
-      // Archive all of this user's registrations before deleting the account
-      const { rows: userRegs } = await pool.query('SELECT id FROM registrations WHERE user_id = $1', [userId]);
-      for (const r of userRegs) await archiveRegistration(r.id, 'user-deleted');
-      await pool.query('DELETE FROM registrations WHERE user_id = $1', [userId]);
-      const { rowCount } = await pool.query('DELETE FROM users WHERE id = $1', [userId]);
-      if (rowCount === 0) return res.status(404).json({ error: 'User not found.' });
-      res.json({ success: true });
-    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+
+      // Look up the user's email so we can also purge records that were
+      // linked only by email (guest bookings made before the account existed,
+      // legacy rows with null user_id, waivers signed before login, etc.)
+      const { rows: userRows } = await pool.query(
+        'SELECT email FROM users WHERE id = $1',
+        [userId]
+      );
+      if (userRows.length === 0) return res.status(404).json({ error: 'User not found.' });
+      const email = userRows[0].email;
+
+      // Purge every artifact tied to this user_id OR email. We do NOT archive
+      // to cancelled_registrations this time — the admin is explicitly
+      // wiping the user, so any historical rows they'd leave behind are
+      // considered 'remnants' and should go too.
+      const deleted = {};
+      const del = async (label, q, params) => {
+        const { rowCount } = await pool.query(q, params);
+        deleted[label] = rowCount;
+      };
+
+      await del('registrations',
+        'DELETE FROM registrations WHERE user_id = $1 OR LOWER(email) = LOWER($2)',
+        [userId, email]);
+      await del('cancelled_registrations',
+        'DELETE FROM cancelled_registrations WHERE user_id = $1 OR LOWER(email) = LOWER($2)',
+        [userId, email]);
+      await del('waivers',
+        'DELETE FROM waivers WHERE user_id = $1 OR LOWER(email) = LOWER($2)',
+        [userId, email]);
+      // Revoke any still-valid password-reset tokens (FK normally cascades
+      // once we delete the user; this is belt-and-braces for race conditions)
+      await del('password_resets',
+        'DELETE FROM password_resets WHERE user_id = $1',
+        [userId]);
+      // Kill any active login sessions for this user so they're signed out
+      // on their other devices immediately. connect-pg-simple stores the
+      // user id inside sess->passport->user as JSON, so we match on that.
+      await del('user_sessions',
+        `DELETE FROM user_sessions WHERE sess::jsonb -> 'passport' ->> 'user' = $1`,
+        [String(userId)]);
+
+      // Finally the user row itself (user_credits cascades via FK)
+      await del('users', 'DELETE FROM users WHERE id = $1', [userId]);
+
+      console.log(`[delete-user] purged user id=${userId} email=${email}:`, deleted);
+      res.json({ success: true, purged: deleted });
+    } catch (e) { console.error('delete-user error:', e); res.status(500).json({ error: 'Server error' }); }
   });
 
   // Admin: full booking history for a user (upcoming, past, cancelled, bundle summary)
