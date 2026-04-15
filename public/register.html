@@ -690,7 +690,9 @@ function showCartSuccess(firstName, classes, packageType, creditsRemaining, acco
         You're All Set,<br>${firstName}!
       </h2>
       <p style="color:var(--mid);margin-bottom:1.5rem">
-        ${packageType === 'credit' ? 'Your bookings are confirmed.' : `Your spot${n !== 1 ? 's are' : ' is'} being held while payment is completed.`}
+        ${packageType === 'credit'
+          ? 'Your bookings are confirmed.'
+          : `Your spot${n !== 1 ? 's are' : ' is'} being held while payment is completed. <span style="display:block;margin-top:0.5rem;font-size:0.88rem">Spot${n !== 1 ? 's' : ''} not paid within 1 hour may be released.</span>`}
       </p>
       <div style="text-align:left;background:var(--cream);border-radius:10px;padding:0.25rem 1rem;margin-bottom:1.5rem">
         ${sorted.map(cls => `
@@ -750,7 +752,7 @@ function showSuccess(firstName, lastName, classId, packageType, creditsRemaining
       <p style="color:var(--mid);margin-bottom:1.5rem">
         ${packageType === 'credit'
           ? `Your booking for <strong>${cls ? cls.title : 'the class'}</strong> is confirmed.`
-          : `Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is being held while payment is completed.`}
+          : `Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is being held while payment is completed. <span style="display:block;margin-top:0.5rem;font-size:0.88rem">Spots not paid within 1 hour may be released.</span>`}
       </p>
       ${paymentBlock}
       ${accountCreated ? `<div style="background:#e8f5e9;border:1.5px solid #a8d5a8;border-radius:10px;padding:0.9rem 1.1rem;margin-bottom:1.25rem;font-size:0.88rem;color:#2e7d32;font-weight:600;text-align:left">✅ Account created — you're now logged in and can track your bookings.</div>` : ''}
