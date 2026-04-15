@@ -85,6 +85,190 @@
     .bundle-summary-box .bundle-ico { font-size: 1.4rem; }
     .empty-mini { font-size: 0.82rem; color: var(--mid); font-style: italic; padding: 0.4rem 0; }
     .detail-loading { font-size: 0.82rem; color: var(--mid); padding: 0.4rem 0; }
+
+    /* ===== Sidebar shell ===== */
+    .admin-shell {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 0;
+      max-width: 1400px;
+      margin: 0 auto;
+      min-height: calc(100vh - 240px);
+    }
+    .admin-sidebar {
+      background: var(--cream);
+      border-right: 1px solid var(--border);
+      padding: 2rem 0 2rem;
+      position: sticky;
+      top: 120px;
+      align-self: start;
+      height: calc(100vh - 120px);
+      overflow-y: auto;
+    }
+    .admin-sidebar-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--charcoal);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 0 1.5rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      margin: 0 0 1rem;
+    }
+    .admin-sidebar-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 0.75rem; }
+    .admin-sidebar-nav a {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--charcoal);
+      font-size: 0.92rem;
+      font-weight: 600;
+      transition: background 0.12s, color 0.12s;
+    }
+    .admin-sidebar-nav a:hover { background: rgba(130,0,0,0.06); color: var(--red); }
+    .admin-sidebar-nav a.active { background: var(--red); color: #fff; }
+    .admin-sidebar-nav a.active:hover { background: var(--red); color: #fff; }
+    .admin-sidebar-nav .si-icon { font-size: 1.05rem; line-height: 1; }
+    .admin-sidebar-nav .si-count {
+      margin-left: auto;
+      background: rgba(0,0,0,0.08);
+      color: var(--charcoal);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 1px 8px;
+      border-radius: 10px;
+      min-width: 18px;
+      text-align: center;
+    }
+    .admin-sidebar-nav a.active .si-count { background: rgba(255,255,255,0.25); color: #fff; }
+    .admin-sidebar-nav hr { margin: 0.75rem 0.5rem; border: none; border-top: 1px solid var(--border); }
+
+    .admin-main { padding: 2rem 2rem 3rem; min-width: 0; /* allow shrinking inside grid */ }
+    .admin-main-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .admin-main-header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.75rem;
+      margin: 0;
+      color: var(--charcoal);
+    }
+    .admin-hamburger {
+      display: none;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 40px;
+      height: 40px;
+      font-size: 1.2rem;
+      cursor: pointer;
+      color: var(--charcoal);
+    }
+    .admin-hamburger:hover { background: var(--cream); }
+
+    .admin-view { animation: viewFade 0.18s ease; }
+    @keyframes viewFade {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ===== Dashboard insight cards ===== */
+    .insight-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .insight-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem 1.5rem 1.25rem;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    .insight-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--red);
+    }
+    .insight-card.insight-warn::before { background: #e65100; }
+    .insight-icon { font-size: 1.6rem; margin-bottom: 0.6rem; line-height: 1; }
+    .insight-value {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--charcoal);
+      line-height: 1;
+      margin-bottom: 0.35rem;
+    }
+    .insight-value-sub {
+      font-family: 'Lato', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--mid);
+      margin-left: 0.25rem;
+    }
+    .insight-card.insight-warn .insight-value { color: #e65100; }
+    .insight-label {
+      font-size: 0.82rem;
+      color: var(--mid);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .insight-sublink {
+      display: inline-block;
+      margin-top: 0.75rem;
+      font-size: 0.78rem;
+      color: var(--red);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .insight-sublink:hover { text-decoration: underline; }
+
+    /* Inside a view, the card grid becomes one column (stacked) */
+    .admin-view .admin-grid {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    /* ===== Mobile: sidebar becomes overlay ===== */
+    @media (max-width: 900px) {
+      .admin-shell { grid-template-columns: 1fr; }
+      .admin-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        height: 100vh;
+        width: 260px;
+        z-index: 300;
+        transform: translateX(-100%);
+        transition: transform 0.22s ease;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        padding-top: 1.5rem;
+      }
+      body.admin-sidebar-open .admin-sidebar { transform: translateX(0); }
+      .admin-sidebar-backdrop {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+        z-index: 299; display: none;
+      }
+      body.admin-sidebar-open .admin-sidebar-backdrop { display: block; }
+      .admin-hamburger { display: inline-flex; align-items: center; justify-content: center; }
+      .admin-main { padding: 1.25rem 1rem 3rem; }
+      .insight-value { font-size: 2rem; }
+    }
   </style>
 </head>
 <body>
@@ -104,53 +288,64 @@
 </nav>
 
 <!-- Admin Dashboard -->
-<div id="adminDashboard">
-  <div class="page-hero">
-    <p class="subtitle">Studio Management</p>
-    <h1>Admin Dashboard</h1>
-    <p>Add new class sessions and manage existing bookings.</p>
-  </div>
+<div id="adminDashboard" class="admin-shell">
 
-  <div class="admin-layout">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar" id="adminSidebar">
+    <div class="admin-sidebar-title">Admin</div>
+    <nav class="admin-sidebar-nav">
+      <a href="#dashboard" data-view="dashboard" class="active"><span class="si-icon">📊</span> Dashboard</a>
+      <a href="#classes"   data-view="classes"><span class="si-icon">📅</span> Classes</a>
+      <a href="#payments"  data-view="payments"><span class="si-icon">💳</span> Pending Payments <span class="si-count" id="sideCountPending"></span></a>
+      <a href="#users"     data-view="users"><span class="si-icon">👥</span> Users <span class="si-count" id="sideCountUsers"></span></a>
+      <hr>
+      <a href="#settings"  data-view="settings"><span class="si-icon">⚙️</span> Settings</a>
+    </nav>
+  </aside>
+  <div class="admin-sidebar-backdrop" id="adminSidebarBackdrop"></div>
+
+  <!-- Main content -->
+  <main class="admin-main">
+    <div class="admin-main-header">
+      <button class="admin-hamburger" id="adminHamburger" aria-label="Open menu">☰</button>
+      <h1 id="adminViewTitle">Dashboard</h1>
+    </div>
     <div id="dashboardAlert" style="display:none;margin-bottom:1rem"></div>
 
+    <!-- ===== DASHBOARD VIEW ===== -->
+    <section class="admin-view" id="view-dashboard">
+      <div class="insight-grid">
+        <div class="insight-card">
+          <div class="insight-icon">📅</div>
+          <div class="insight-value" id="insightUpcomingClasses">—</div>
+          <div class="insight-label">Classes in next 7 days</div>
+          <a href="#classes" class="insight-sublink" data-view="classes">View classes →</a>
+        </div>
+        <div class="insight-card">
+          <div class="insight-icon">🪑</div>
+          <div class="insight-value" id="insightOpenSpots">—</div>
+          <div class="insight-label">Open spots (next 7 days)</div>
+        </div>
+        <div class="insight-card" id="insightPendingCard">
+          <div class="insight-icon">💳</div>
+          <div class="insight-value"><span id="insightPendingCount">—</span> <span class="insight-value-sub" id="insightPendingAmount">$0</span></div>
+          <div class="insight-label">Pending payments / $ owed</div>
+          <a href="#payments" class="insight-sublink" data-view="payments">Review pending →</a>
+        </div>
+        <div class="insight-card">
+          <div class="insight-icon">👥</div>
+          <div class="insight-value" id="insightTotalUsers">—</div>
+          <div class="insight-label">Registered users</div>
+          <a href="#users" class="insight-sublink" data-view="users">Manage users →</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== CLASSES VIEW ===== -->
+    <section class="admin-view" id="view-classes" hidden>
     <div class="admin-grid">
 
-      <!-- Class Roster (expanded by default, at top) -->
-      <div class="admin-card" style="grid-column: 1 / -1" id="card-roster">
-        <div class="admin-card-header" onclick="toggleCard('card-roster')">
-          <h3>📋 Class Roster</h3>
-          <span id="rosterCount" class="badge-count">0</span>
-          <span class="collapse-toggle">&#9660;</span>
-        </div>
-        <div class="admin-card-body">
-          <div class="form-group" style="margin-bottom:1.25rem">
-            <label for="rosterClassSelect">Select a class to view registrations</label>
-            <select id="rosterClassSelect" onchange="loadRoster()">
-              <option value="">— Choose a class —</option>
-            </select>
-          </div>
-          <div id="rosterList">
-            <div class="empty-state"><p>Select a class above to see who is registered.</p></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Pending Payments (expanded by default) -->
-      <div class="admin-card" style="grid-column: 1 / -1" id="card-pending">
-        <div class="admin-card-header" onclick="toggleCard('card-pending')">
-          <h3>💳 Pending Payments</h3>
-          <span id="pendingCount" class="badge-count">0</span>
-          <span class="collapse-toggle">&#9660;</span>
-        </div>
-        <div class="admin-card-body">
-          <div id="pendingList">
-            <div class="empty-state"><p>Loading…</p></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Add / Edit Class (collapsed) -->
+      <!-- Add / Edit Class -->
       <div class="admin-card collapsed" style="grid-column: 1 / -1" id="card-add-class">
         <div class="admin-card-header" onclick="toggleCard('card-add-class')">
           <h3 id="classFormTitle">➕ Add New Class</h3>
@@ -238,8 +433,28 @@
         </div>
       </div>
 
-      <!-- Registrations (collapsed) -->
-      <div class="admin-card collapsed" id="card-registrations">
+      <!-- Class Roster -->
+      <div class="admin-card" style="grid-column: 1 / -1" id="card-roster">
+        <div class="admin-card-header" onclick="toggleCard('card-roster')">
+          <h3>📋 Class Roster</h3>
+          <span id="rosterCount" class="badge-count">0</span>
+          <span class="collapse-toggle">&#9660;</span>
+        </div>
+        <div class="admin-card-body">
+          <div class="form-group" style="margin-bottom:1.25rem">
+            <label for="rosterClassSelect">Select a class to view registrations</label>
+            <select id="rosterClassSelect" onchange="loadRoster()">
+              <option value="">— Choose a class —</option>
+            </select>
+          </div>
+          <div id="rosterList">
+            <div class="empty-state"><p>Select a class above to see who is registered.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Registrations (collapsed) -->
+      <div class="admin-card collapsed" style="grid-column: 1 / -1" id="card-registrations">
         <div class="admin-card-header" onclick="toggleCard('card-registrations')">
           <h3>Recent Registrations</h3>
           <span id="regCount" class="badge-count">0</span>
@@ -247,6 +462,46 @@
         </div>
         <div class="admin-card-body" id="registrationsList">
           <div class="empty-state"><p>No registrations yet.</p></div>
+        </div>
+      </div>
+
+    </div>
+    </section>
+
+    <!-- ===== PAYMENTS VIEW ===== -->
+    <section class="admin-view" id="view-payments" hidden>
+    <div class="admin-grid">
+
+      <!-- Pending Payments -->
+      <div class="admin-card" style="grid-column: 1 / -1" id="card-pending">
+        <div class="admin-card-header" onclick="toggleCard('card-pending')">
+          <h3>💳 Pending Payments</h3>
+          <span id="pendingCount" class="badge-count">0</span>
+          <span class="collapse-toggle">&#9660;</span>
+        </div>
+        <div class="admin-card-body">
+          <div id="pendingList">
+            <div class="empty-state"><p>Loading…</p></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    </section>
+
+    <!-- ===== USERS VIEW ===== -->
+    <section class="admin-view" id="view-users" hidden>
+    <div class="admin-grid">
+
+      <!-- All Users -->
+      <div class="admin-card" style="grid-column: 1 / -1" id="card-users">
+        <div class="admin-card-header" onclick="toggleCard('card-users')">
+          <h3>👥 All Users</h3>
+          <span id="allUsersCount" class="badge-count">0</span>
+          <span class="collapse-toggle">&#9660;</span>
+        </div>
+        <div class="admin-card-body" id="allUsersList">
+          <div class="empty-state"><p>Loading users…</p></div>
         </div>
       </div>
 
@@ -270,8 +525,15 @@
         </div>
       </div>
 
-      <!-- Settings (collapsed) -->
-      <div class="admin-card collapsed" style="grid-column: 1 / -1" id="card-settings">
+    </div>
+    </section>
+
+    <!-- ===== SETTINGS VIEW ===== -->
+    <section class="admin-view" id="view-settings" hidden>
+    <div class="admin-grid">
+
+      <!-- Settings -->
+      <div class="admin-card" style="grid-column: 1 / -1" id="card-settings">
         <div class="admin-card-header" onclick="toggleCard('card-settings')">
           <h3>⚙️ Settings</h3>
           <span class="collapse-toggle">&#9660;</span>
@@ -310,20 +572,10 @@
         </div>
       </div>
 
-      <!-- All Users (collapsed) -->
-      <div class="admin-card collapsed" style="grid-column: 1 / -1" id="card-users">
-        <div class="admin-card-header" onclick="toggleCard('card-users')">
-          <h3>👥 All Users</h3>
-          <span id="allUsersCount" class="badge-count">0</span>
-          <span class="collapse-toggle">&#9660;</span>
-        </div>
-        <div class="admin-card-body" id="allUsersList">
-          <div class="empty-state"><p>Loading users…</p></div>
-        </div>
-      </div>
-
     </div>
-  </div>
+    </section>
+
+  </main>
 </div>
 
 <footer>
@@ -379,6 +631,7 @@ async function loadDashboard() {
     renderRegistrations(registrations);
     renderPendingPayments(allClasses, registrations);
     populateRosterSelect(allClasses, registrations);
+    renderDashboardInsights(allClasses, registrations);
     loadAdminUsers();
     loadSettings();
   } catch (e) {
@@ -388,6 +641,89 @@ async function loadDashboard() {
     alert.style.display = 'block';
   }
 }
+
+// ===== Dashboard insight cards =====
+function renderDashboardInsights(classes, registrations) {
+  const now = new Date();
+  const weekOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  // Classes scheduled in the next 7 days (from now)
+  const upcomingWeek = classes.filter(c => {
+    const d = new Date(`${c.date}T${c.time || '00:00'}`);
+    return d >= now && d <= weekOut;
+  });
+
+  // Open spots across those classes
+  const openSpots = upcomingWeek.reduce((sum, c) => {
+    return sum + Math.max(0, (c.capacity || 0) - (c.registeredCount || 0));
+  }, 0);
+
+  // Pending payments — single = $25, 4pack = $85
+  const pending = registrations.filter(r => r.paymentStatus !== 'paid');
+  const amountOwed = pending.reduce((sum, r) => {
+    return sum + (r.packageType === '4pack' ? 85 : 25);
+  }, 0);
+
+  document.getElementById('insightUpcomingClasses').textContent = upcomingWeek.length;
+  document.getElementById('insightOpenSpots').textContent = openSpots;
+  document.getElementById('insightPendingCount').textContent = pending.length;
+  document.getElementById('insightPendingAmount').textContent = `$${amountOwed}`;
+
+  // Sidebar badge for pending payments
+  const sidePending = document.getElementById('sideCountPending');
+  if (sidePending) sidePending.textContent = pending.length || '';
+
+  // Flag the pending card if there's money outstanding
+  const pendingCard = document.getElementById('insightPendingCard');
+  if (pendingCard) pendingCard.classList.toggle('insight-warn', pending.length > 0);
+}
+
+// ===== Sidebar view switching =====
+const VIEWS = ['dashboard', 'classes', 'payments', 'users', 'settings'];
+const VIEW_TITLES = {
+  dashboard: 'Dashboard',
+  classes:   'Classes',
+  payments:  'Pending Payments',
+  users:     'Users',
+  settings:  'Settings'
+};
+
+function showView(name) {
+  if (!VIEWS.includes(name)) name = 'dashboard';
+  VIEWS.forEach(v => {
+    const el = document.getElementById(`view-${v}`);
+    if (el) el.hidden = v !== name;
+  });
+  document.querySelectorAll('.admin-sidebar-nav a[data-view]').forEach(a => {
+    a.classList.toggle('active', a.dataset.view === name);
+  });
+  const title = document.getElementById('adminViewTitle');
+  if (title) title.textContent = VIEW_TITLES[name];
+  if (history.replaceState) history.replaceState(null, '', `#${name}`);
+  document.body.classList.remove('admin-sidebar-open');
+  window.scrollTo(0, 0);
+}
+
+// Wire sidebar clicks + insight-sublink "→" links
+document.querySelectorAll('[data-view]').forEach(a => {
+  a.addEventListener('click', (e) => {
+    if (!a.dataset.view) return;
+    e.preventDefault();
+    showView(a.dataset.view);
+  });
+});
+
+// Mobile sidebar open/close
+const hamburger = document.getElementById('adminHamburger');
+const backdrop  = document.getElementById('adminSidebarBackdrop');
+if (hamburger) hamburger.addEventListener('click', () => document.body.classList.add('admin-sidebar-open'));
+if (backdrop)  backdrop.addEventListener('click',  () => document.body.classList.remove('admin-sidebar-open'));
+
+// Initial view — from URL hash or default
+showView((window.location.hash || '').replace('#', '') || 'dashboard');
+window.addEventListener('hashchange', () => {
+  showView((window.location.hash || '').replace('#', '') || 'dashboard');
+});
 
 function formatTime(t) {
   const [h, m] = t.split(':').map(Number);
@@ -987,6 +1323,12 @@ async function loadAdminUsers() {
     const users = await res.json();
     const admins = users.filter(u => u.is_admin);
     document.getElementById('adminUserCount').textContent = admins.length;
+
+    // Dashboard insight card + sidebar badge
+    const insightUsersEl = document.getElementById('insightTotalUsers');
+    if (insightUsersEl) insightUsersEl.textContent = users.length;
+    const sideUsersEl = document.getElementById('sideCountUsers');
+    if (sideUsersEl) sideUsersEl.textContent = users.length || '';
     const list = document.getElementById('adminUsersList');
     if (!admins.length) {
       list.innerHTML = '<div class="empty-state"><p>No admin users yet. Grant access using the field above.</p></div>';
