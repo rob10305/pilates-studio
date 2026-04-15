@@ -138,12 +138,54 @@
         </div>
       </div>
 
-      <p style="font-size:0.88rem;color:var(--mid);margin-bottom:1rem">Class fee: <strong>$25</strong> — Payment via Interac e-Transfer is required upon booking. See our <a href="cancellation-policy.html" style="color:var(--red)">Cancellation Policy</a>.</p>
+      <p style="font-size:0.88rem;color:var(--mid);margin-bottom:1rem">Payment via Interac e-Transfer is required upon booking. See our <a href="cancellation-policy.html" style="color:var(--red)">Cancellation Policy</a>.</p>
 
       <button type="submit" class="btn btn-primary form-submit" id="submitBtn">
         Confirm Booking
       </button>
     </form>
+  </div>
+</div>
+
+<!-- Payment Choice Modal -->
+<div id="paymentModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:2rem 1.75rem;box-shadow:0 16px 48px rgba(0,0,0,0.18)">
+    <p style="font-size:0.75rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--red);margin-bottom:0.5rem;text-align:center">How would you like to pay?</p>
+    <h2 style="font-family:'Playfair Display',serif;font-size:1.5rem;text-align:center;margin:0 0 1.5rem;color:var(--charcoal)">Choose Your Option</h2>
+    <div style="display:flex;flex-direction:column;gap:0.875rem">
+      <!-- Single class -->
+      <button onclick="doSubmit('single')" style="display:flex;align-items:center;gap:1rem;background:var(--cream);border:2px solid var(--border);border-radius:12px;padding:1rem 1.25rem;cursor:pointer;text-align:left;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="flex:1">
+          <p style="font-weight:700;font-size:1rem;color:var(--charcoal);margin:0 0 0.2rem">Pay Per Class</p>
+          <p style="font-size:0.83rem;color:var(--mid);margin:0">Single class · no commitment</p>
+        </div>
+        <p style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:var(--charcoal);margin:0;white-space:nowrap">$25 <span style="font-size:0.75rem;font-weight:400;color:var(--mid)">CAD</span></p>
+      </button>
+      <!-- 4-class pack -->
+      <button onclick="doSubmit('4pack')" style="display:flex;align-items:center;gap:1rem;background:#fff8f8;border:2px solid var(--red);border-radius:12px;padding:1rem 1.25rem;cursor:pointer;text-align:left;position:relative">
+        <span style="position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--red);color:#fff;font-size:0.68rem;font-weight:700;letter-spacing:0.1em;padding:0.2rem 0.7rem;border-radius:20px;white-space:nowrap">BEST VALUE</span>
+        <div style="flex:1">
+          <p style="font-weight:700;font-size:1rem;color:var(--charcoal);margin:0 0 0.2rem">4-Class Package</p>
+          <p style="font-size:0.83rem;color:var(--mid);margin:0">Book 4 · save $15 · credits applied automatically</p>
+        </div>
+        <p style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:var(--red);margin:0;white-space:nowrap">$85 <span style="font-size:0.75rem;font-weight:400;color:var(--mid)">CAD</span></p>
+      </button>
+    </div>
+    <p style="font-size:0.78rem;color:var(--mid);text-align:center;margin:1.25rem 0 0">All payments via Interac e-Transfer to <strong>amanda@redmaplemovement.ca</strong></p>
+    <button onclick="closePaymentModal()" style="display:block;margin:1rem auto 0;background:none;border:none;color:var(--mid);font-size:0.83rem;cursor:pointer;text-decoration:underline">Cancel</button>
+  </div>
+</div>
+
+<!-- Credit Use Confirmation Modal -->
+<div id="creditModal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:2rem 1.75rem;box-shadow:0 16px 48px rgba(0,0,0,0.18);text-align:center">
+    <p style="font-size:2rem;margin:0 0 0.75rem">🎟️</p>
+    <h2 style="font-family:'Playfair Display',serif;font-size:1.4rem;margin:0 0 0.5rem;color:var(--charcoal)">Use a Class Credit</h2>
+    <p id="creditModalText" style="color:var(--mid);font-size:0.93rem;margin:0 0 1.5rem;line-height:1.6"></p>
+    <div style="display:flex;flex-direction:column;gap:0.75rem">
+      <button onclick="doSubmit('credit')" class="btn btn-primary" style="width:100%">Use 1 Credit — Book Now</button>
+      <button onclick="showPaymentModal()" style="background:none;border:none;color:var(--red);font-size:0.87rem;cursor:pointer;text-decoration:underline">Pay separately instead</button>
+    </div>
   </div>
 </div>
 
@@ -321,9 +363,50 @@ async function submitForm(e) {
     // If waiver check fails, allow booking to proceed (fail open)
   }
 
-  // ── Step 2: Submit registration ────────────────────────────────
+  // ── Step 2: Check credits, then show payment modal ─────────────
   document.getElementById('waiverRequired').style.display = 'none';
-  btn.textContent = 'Booking…';
+  btn.textContent = 'Checking…';
+
+  try {
+    const creditRes = await fetch('/api/credits/me');
+    const { balance } = creditRes.ok ? await creditRes.json() : { balance: 0 };
+    window._pendingBookingBody = body;
+
+    btn.textContent = 'Confirm Booking';
+    btn.disabled = false;
+
+    if (balance > 0) {
+      // Show credit confirmation modal
+      document.getElementById('creditModalText').textContent =
+        `You have ${balance} class credit${balance !== 1 ? 's' : ''} remaining. Use 1 credit to confirm this booking — no payment needed!`;
+      document.getElementById('creditModal').style.display = 'flex';
+    } else {
+      showPaymentModal();
+    }
+  } catch {
+    // Fallback: show payment modal
+    window._pendingBookingBody = body;
+    btn.textContent = 'Confirm Booking';
+    btn.disabled = false;
+    showPaymentModal();
+  }
+}
+
+function showPaymentModal() {
+  document.getElementById('creditModal').style.display = 'none';
+  document.getElementById('paymentModal').style.display = 'flex';
+}
+
+function closePaymentModal() {
+  document.getElementById('paymentModal').style.display = 'none';
+  document.getElementById('creditModal').style.display = 'none';
+}
+
+async function doSubmit(packageType) {
+  closePaymentModal();
+  const body = { ...window._pendingBookingBody, packageType };
+  const alertBox = document.getElementById('alertBox');
+  alertBox.style.display = 'none';
 
   try {
     const res = await fetch('/api/register', {
@@ -334,41 +417,60 @@ async function submitForm(e) {
     const data = await res.json();
 
     if (res.ok) {
-      showSuccess(body.firstName, body.lastName, body.classId);
+      showSuccess(body.firstName, body.lastName, body.classId, packageType, data.creditsRemaining);
     } else {
       alertBox.className = 'alert alert-error';
       alertBox.textContent = data.error || 'Something went wrong. Please try again.';
       alertBox.style.display = 'block';
-      btn.textContent = 'Confirm Booking';
-      btn.disabled = false;
     }
   } catch {
     alertBox.className = 'alert alert-error';
     alertBox.textContent = 'Network error. Please check your connection and try again.';
     alertBox.style.display = 'block';
-    btn.textContent = 'Confirm Booking';
-    btn.disabled = false;
   }
 }
 
-function showSuccess(firstName, lastName, classId) {
+function showSuccess(firstName, lastName, classId, packageType, creditsRemaining) {
   const cls = allClasses.find(c => c.id === classId);
-  const clsDate = cls ? formatDate(cls.date) : '';
   const card = document.getElementById('formCard');
-  card.innerHTML = `
-    <div class="success-card" style="text-align:center;padding:2.5rem 2rem">
-      <p class="subtitle" style="font-size:0.8rem;letter-spacing:0.14em;margin-bottom:1rem">MOVE. BREATHE. TRANSFORM.</p>
-      <h2 style="font-family:'Playfair Display',serif;font-size:2rem;margin-bottom:1rem;line-height:1.2">Spot Reserved,<br>${firstName}</h2>
-      <p style="color:var(--mid);margin-bottom:2rem">Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is being held while payment is completed.</p>
 
-      <div style="width:60px;height:1px;background:var(--border);margin:0 auto 2rem"></div>
-
+  let paymentBlock = '';
+  if (packageType === 'credit') {
+    paymentBlock = `
+      <div style="background:#e8f5e9;border-radius:10px;padding:1.25rem;margin-bottom:1.5rem">
+        <p style="font-size:0.8rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2e7d32;margin-bottom:0.4rem">✅ Booking Confirmed</p>
+        <p style="font-size:0.95rem;color:#1b5e20;margin:0">1 class credit used — <strong>${creditsRemaining ?? 0} credit${creditsRemaining !== 1 ? 's' : ''} remaining</strong> in your account.</p>
+      </div>`;
+  } else if (packageType === '4pack') {
+    paymentBlock = `
+      <div style="width:60px;height:1px;background:var(--border);margin:0 auto 1.5rem"></div>
+      <p style="font-size:0.8rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--mid);margin-bottom:0.5rem">SECURE YOUR 4-CLASS PACKAGE</p>
+      <p style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:#820000;margin-bottom:0.75rem">$85 CAD</p>
+      <p style="font-size:0.9rem;color:var(--mid);margin-bottom:0.25rem">Send via Interac e-Transfer to</p>
+      <p style="font-size:1.05rem;font-weight:700;color:var(--charcoal);margin-bottom:0.75rem">amanda@redmaplemovement.ca</p>
+      <p style="font-size:0.82rem;color:var(--mid);margin-bottom:1.5rem">Once payment is confirmed, 3 credits will be added to your account for future classes.</p>`;
+  } else {
+    paymentBlock = `
+      <div style="width:60px;height:1px;background:var(--border);margin:0 auto 1.5rem"></div>
       <p style="font-size:0.8rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--mid);margin-bottom:0.5rem">SECURE YOUR SPOT</p>
       <p style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:#820000;margin-bottom:0.75rem">$25 CAD</p>
       <p style="font-size:0.9rem;color:var(--mid);margin-bottom:0.25rem">Send via Interac e-Transfer to</p>
-      <p style="font-size:1.05rem;font-weight:700;color:var(--charcoal);margin-bottom:1.25rem">amanda@redmaplemovement.ca</p>
-      <p style="font-size:0.8rem;color:var(--light);margin-bottom:2.5rem">Cancellations made more than 24 hours before class start are fully refundable. <a href="cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
+      <p style="font-size:1.05rem;font-weight:700;color:var(--charcoal);margin-bottom:1.5rem">amanda@redmaplemovement.ca</p>`;
+  }
 
+  card.innerHTML = `
+    <div class="success-card" style="text-align:center;padding:2.5rem 2rem">
+      <p class="subtitle" style="font-size:0.8rem;letter-spacing:0.14em;margin-bottom:1rem">MOVE. BREATHE. TRANSFORM.</p>
+      <h2 style="font-family:'Playfair Display',serif;font-size:2rem;margin-bottom:0.75rem;line-height:1.2">
+        ${packageType === 'credit' ? 'You\'re In,' : 'Spot Reserved,'}<br>${firstName}
+      </h2>
+      <p style="color:var(--mid);margin-bottom:1.5rem">
+        ${packageType === 'credit'
+          ? `Your booking for <strong>${cls ? cls.title : 'the class'}</strong> is confirmed.`
+          : `Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is being held while payment is completed.`}
+      </p>
+      ${paymentBlock}
+      <p style="font-size:0.8rem;color:var(--light);margin-bottom:2rem">Cancellations made more than 24 hours before class start are fully refundable. <a href="cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
       <div style="display:flex;flex-direction:column;gap:0.75rem">
         <a href="my-schedule.html" class="btn btn-primary" style="width:100%;text-align:center">View My Schedule</a>
         <a href="register.html" class="btn btn-outline" style="width:100%;text-align:center">Book Another Class</a>

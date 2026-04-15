@@ -312,6 +312,54 @@ async function sendNewBookingNotification({ notifyEmail, registrant, cls }) {
   });
 }
 
+async function sendCreditBookingEmail({ to, firstName, cls, creditsRemaining }) {
+  if (!process.env.RESEND_API_KEY) return;
+  await getResend().emails.send({
+    from: FROM_ADDRESS,
+    to,
+    subject: `You're booked — ${cls.title} on ${formatClassDate(cls.date)}`,
+    html: emailWrap({
+      heading: 'You\'re Booked!',
+      subtitle: `1 class credit used — ${creditsRemaining} credit${creditsRemaining !== 1 ? 's' : ''} remaining in your account.`,
+      detailRows: [
+        ['Class',       cls.title],
+        ['Date',        formatClassDate(cls.date)],
+        ['Time',        formatClassTime(cls.time)],
+        ['Instructor',  cls.instructor],
+        ['Duration',    `${cls.duration} minutes`],
+        ['Credits Left', `${creditsRemaining} of your 4-class pack`],
+      ],
+      body: `<p style="font-size:13px;color:#b0b0b0">Cancellations more than 24 hours before class are fully refundable. <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>`,
+      buttonLabel: 'View My Schedule',
+      buttonUrl: `${APP_URL}/my-schedule.html`
+    })
+  });
+}
+
+async function sendPackageConfirmedEmail({ to, firstName, cls, creditsRemaining }) {
+  if (!process.env.RESEND_API_KEY) return;
+  await getResend().emails.send({
+    from: FROM_ADDRESS,
+    to,
+    subject: `4-Class Package Confirmed — Welcome to Red Maple Movement!`,
+    html: emailWrap({
+      heading: '4-Class Package Confirmed',
+      subtitle: `Payment received — your class is confirmed and ${creditsRemaining} credit${creditsRemaining !== 1 ? 's' : ''} have been added to your account.`,
+      detailRows: [
+        ['Class',           cls.title],
+        ['Date',            formatClassDate(cls.date)],
+        ['Time',            formatClassTime(cls.time)],
+        ['Instructor',      cls.instructor],
+        ['Credits Remaining', `${creditsRemaining} — use these when booking future classes`],
+      ],
+      body: `<p style="font-size:14px;color:#6b6b6b;margin:0 0 8px">Your remaining credits will be automatically applied when you book your next class — no payment needed until your balance runs out.</p>
+             <p style="font-size:13px;color:#b0b0b0;margin:0">Cancellations more than 24 hours before class are fully refundable. <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>`,
+      buttonLabel: 'Book Your Next Class',
+      buttonUrl: `${APP_URL}/register.html`
+    })
+  });
+}
+
 if (!process.env.DATABASE_URL) {
   console.error('ERROR: DATABASE_URL environment variable is not set.');
   process.exit(1);
@@ -431,6 +479,25 @@ async function initDB() {
   // Add payment_alert_sent column — tracks whether admin has been notified for this unpaid registration
   await pool.query(`
     ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_alert_sent BOOLEAN NOT NULL DEFAULT FALSE;
+  `);
+
+  // Add package_type column — 'single', '4pack', or 'credit'
+  await pool.query(`
+    ALTER TABLE registrations ADD COLUMN IF NOT EXISTS package_type TEXT NOT NULL DEFAULT 'single';
+  `);
+
+  // Add user_id column to registrations for linking to the credits system
+  await pool.query(`
+    ALTER TABLE registrations ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+  `);
+
+  // Class credits — tracks each user's remaining credit balance
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_credits (
+      user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      balance    INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
 }
@@ -717,8 +784,17 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
+  // Get current user's credit balance
+  app.get('/api/credits/me', async (req, res) => {
+    if (!req.isAuthenticated()) return res.json({ balance: 0 });
+    try {
+      const { rows } = await pool.query('SELECT balance FROM user_credits WHERE user_id = $1', [req.user.id]);
+      res.json({ balance: rows.length ? rows[0].balance : 0 });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
   app.post('/api/register', async (req, res) => {
-    const { classId, firstName, lastName, email, phone } = req.body;
+    const { classId, firstName, lastName, email, phone, packageType } = req.body;
     if (!classId || !firstName || !lastName || !email)
       return res.status(400).json({ error: 'Missing required fields' });
     try {
@@ -733,12 +809,40 @@ async function createApp() {
         'SELECT id FROM registrations WHERE "classId" = $1 AND LOWER(email) = LOWER($2)', [classId, email]
       );
       if (dupRows.length > 0) return res.status(409).json({ error: 'You are already registered for this class' });
+
       const registrationId = Date.now().toString();
+      const userId = req.isAuthenticated() ? req.user.id : null;
+
+      // ── Credit booking: deduct 1 credit, auto-confirm ──────────
+      if (packageType === 'credit') {
+        if (!req.isAuthenticated()) return res.status(401).json({ error: 'Please sign in to use credits.' });
+        const { rows: cr } = await pool.query('SELECT balance FROM user_credits WHERE user_id = $1', [req.user.id]);
+        const balance = cr.length ? cr[0].balance : 0;
+        if (balance <= 0) return res.status(400).json({ error: 'No class credits remaining.' });
+        // Deduct 1 credit
+        await pool.query(`
+          INSERT INTO user_credits (user_id, balance, updated_at) VALUES ($1, $2, NOW())
+          ON CONFLICT (user_id) DO UPDATE SET balance = user_credits.balance - 1, updated_at = NOW()
+        `, [req.user.id, balance - 1]);
+        await pool.query(
+          `INSERT INTO registrations (id,"classId","firstName","lastName",email,phone,"registeredAt",payment_status,package_type,user_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,'paid','credit',$8)`,
+          [registrationId, classId, firstName, lastName, email, phone || '', new Date().toISOString(), userId]
+        );
+        const creditsRemaining = balance - 1;
+        res.status(201).json({ success: true, registrationId, packageType: 'credit', creditsRemaining });
+        sendCreditBookingEmail({ to: email, firstName, cls, creditsRemaining }).catch(console.error);
+        return;
+      }
+
+      // ── 4-pack or single: create pending registration ──────────
+      const pkgType = packageType === '4pack' ? '4pack' : 'single';
       await pool.query(
-        `INSERT INTO registrations (id,"classId","firstName","lastName",email,phone,"registeredAt",payment_status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [registrationId, classId, firstName, lastName, email, phone || '', new Date().toISOString(), 'pending']
+        `INSERT INTO registrations (id,"classId","firstName","lastName",email,phone,"registeredAt",payment_status,package_type,user_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9)`,
+        [registrationId, classId, firstName, lastName, email, phone || '', new Date().toISOString(), pkgType, userId]
       );
-      res.status(201).json({ success: true, registrationId, message: `You're booked! See you in class, ${firstName}.` });
+      res.status(201).json({ success: true, registrationId, packageType: pkgType });
       sendConfirmationEmail({ to: email, firstName, lastName, cls, registrationId }).catch(e => console.error('Confirmation email error:', e.message));
       getSetting('booking_notify_email').then(notifyEmail => {
         if (notifyEmail) sendNewBookingNotification({ notifyEmail, registrant: { firstName, lastName, email, phone }, cls }).catch(e => console.error('Notify email error:', e.message));
@@ -757,6 +861,7 @@ async function createApp() {
         id: r.id, classId: r.classId, firstName: r.firstName,
         lastName: r.lastName, email: r.email, phone: r.phone,
         registeredAt: r.registeredAt, paymentStatus: r.payment_status,
+        packageType: r.package_type || 'single', userId: r.user_id,
         class: r.title ? { title: r.title, date: r.date, time: r.time, instructor: r.instructor } : null
       }));
       res.json(enriched);
@@ -802,9 +907,11 @@ async function createApp() {
     try {
       const { rows } = await pool.query(`
         SELECT u.id, u.email, u.first_name, u.last_name, u.is_admin, u.created_at,
-               w.id AS waiver_id, w.signed_at AS waiver_signed_at
+               w.id AS waiver_id, w.signed_at AS waiver_signed_at,
+               COALESCE(uc.balance, 0) AS credit_balance
         FROM users u
         LEFT JOIN waivers w ON w.user_id = u.id OR LOWER(w.email) = LOWER(u.email)
+        LEFT JOIN user_credits uc ON uc.user_id = u.id
         ORDER BY u.is_admin DESC, u.created_at ASC
       `);
       res.json(rows);
@@ -851,26 +958,51 @@ async function createApp() {
   // Admin: mark a registration as paid
   app.post('/api/admin/registrations/:id/mark-paid', requireAdmin, async (req, res) => {
     try {
-      const { rowCount } = await pool.query(
-        `UPDATE registrations SET payment_status = 'paid' WHERE id = $1`,
-        [req.params.id]
-      );
-      if (rowCount === 0) return res.status(404).json({ error: 'Registration not found' });
-
-      // Send payment confirmation email to the user
       const { rows } = await pool.query(
-        `SELECT r."firstName", r.email, r."classId" FROM registrations r WHERE r.id = $1`,
-        [req.params.id]
+        `SELECT r.*, c.title, c.date, c.time, c.instructor, c.duration
+         FROM registrations r JOIN classes c ON c.id = r."classId"
+         WHERE r.id = $1`, [req.params.id]
       );
-      if (rows.length > 0) {
-        const { rows: clsRows } = await pool.query('SELECT * FROM classes WHERE id = $1', [rows[0].classId]);
-        if (clsRows.length > 0) {
-          sendPaymentConfirmedEmail({ to: rows[0].email, firstName: rows[0].firstName, cls: clsRows[0] })
-            .catch(e => console.error('Payment confirmed email error:', e.message));
-        }
-      }
+      if (!rows.length) return res.status(404).json({ error: 'Registration not found' });
+      const reg = rows[0];
+      const cls = { title: reg.title, date: reg.date, time: reg.time, instructor: reg.instructor, duration: reg.duration };
 
-      res.json({ success: true });
+      await pool.query(`UPDATE registrations SET payment_status = 'paid' WHERE id = $1`, [req.params.id]);
+
+      // 4-pack: add 3 credits (1 used for this class, 3 carry forward)
+      if (reg.package_type === '4pack') {
+        const userId = reg.user_id;
+        let creditsRemaining = 3;
+        if (userId) {
+          await pool.query(`
+            INSERT INTO user_credits (user_id, balance, updated_at) VALUES ($1, 3, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET balance = user_credits.balance + 3, updated_at = NOW()
+          `, [userId]);
+          const { rows: cr } = await pool.query('SELECT balance FROM user_credits WHERE user_id = $1', [userId]);
+          creditsRemaining = cr.length ? cr[0].balance : 3;
+        }
+        res.json({ success: true, packageType: '4pack', creditsAdded: 3, creditsRemaining });
+        sendPackageConfirmedEmail({ to: reg.email, firstName: reg.firstName, cls, creditsRemaining })
+          .catch(e => console.error('Package confirmed email error:', e.message));
+      } else {
+        res.json({ success: true, packageType: reg.package_type || 'single' });
+        sendPaymentConfirmedEmail({ to: reg.email, firstName: reg.firstName, cls })
+          .catch(e => console.error('Payment confirmed email error:', e.message));
+      }
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Admin: manually adjust a user's credit balance
+  app.post('/api/admin/users/:userId/credits', requireAdmin, async (req, res) => {
+    const { adjustment } = req.body;
+    if (adjustment === undefined || isNaN(adjustment)) return res.status(400).json({ error: 'Adjustment value required' });
+    try {
+      await pool.query(`
+        INSERT INTO user_credits (user_id, balance, updated_at) VALUES ($1, $2, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET balance = GREATEST(0, user_credits.balance + $2), updated_at = NOW()
+      `, [req.params.userId, parseInt(adjustment)]);
+      const { rows } = await pool.query('SELECT balance FROM user_credits WHERE user_id = $1', [req.params.userId]);
+      res.json({ success: true, balance: rows.length ? rows[0].balance : 0 });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 

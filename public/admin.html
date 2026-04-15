@@ -454,7 +454,7 @@ function renderPendingPayments(classes, registrations) {
         <tr style="border-bottom:2px solid var(--red);text-align:left">
           <th style="padding:8px 12px">Name</th>
           <th style="padding:8px 12px">Email</th>
-          <th style="padding:8px 12px">Phone</th>
+          <th style="padding:8px 12px">Package</th>
           <th style="padding:8px 12px">Class</th>
           <th style="padding:8px 12px">Date</th>
           <th style="padding:8px 12px">Registered</th>
@@ -462,34 +462,45 @@ function renderPendingPayments(classes, registrations) {
         </tr>
       </thead>
       <tbody>
-        ${pending.map(r => `
-          <tr style="border-bottom:1px solid #f0f0f0">
+        ${pending.map(r => {
+          const pkg = r.packageType || 'single';
+          const pkgBadge = pkg === '4pack'
+            ? '<span style="background:#fff3cd;color:#856404;font-size:0.7rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:12px;white-space:nowrap">4-PACK · $85</span>'
+            : '<span style="background:#e8f5e9;color:#2e7d32;font-size:0.7rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:12px;white-space:nowrap">Single · $25</span>';
+          return `
+          <tr style="border-bottom:1px solid #f0f0f0${pkg === '4pack' ? ';background:#fffdf0' : ''}">
             <td style="padding:10px 12px;font-weight:600">${r.firstName} ${r.lastName}</td>
             <td style="padding:10px 12px"><a href="mailto:${r.email}" style="color:var(--red)">${r.email}</a></td>
-            <td style="padding:10px 12px;color:var(--mid)">${r.phone || '—'}</td>
+            <td style="padding:10px 12px">${pkgBadge}</td>
             <td style="padding:10px 12px;font-weight:600">${r.cls ? r.cls.title : '—'}</td>
             <td style="padding:10px 12px;color:var(--mid);white-space:nowrap">${r.cls ? formatDate(r.cls.date) + ' ' + formatTime(r.cls.time) : '—'}</td>
             <td style="padding:10px 12px;color:var(--mid);white-space:nowrap">${new Date(r.registeredAt).toLocaleDateString('en-CA')}</td>
             <td style="padding:10px 12px;text-align:right;white-space:nowrap">
               <div style="display:flex;gap:0.4rem;justify-content:flex-end">
                 <button style="background:#d4edda;color:#155724;border:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.78rem;font-weight:700;cursor:pointer"
-                  onclick="markPaidFromPending('${r.id}', '${r.firstName} ${r.lastName}')">✅ Mark Paid</button>
+                  onclick="markPaidFromPending('${r.id}', '${r.firstName} ${r.lastName}', '${pkg}')">✅ Mark Paid</button>
                 <button class="btn-danger" style="font-size:0.78rem;padding:0.3rem 0.75rem"
                   onclick="removePending('${r.id}', '${r.firstName} ${r.lastName}')">❌ Remove</button>
               </div>
             </td>
-          </tr>`).join('')}
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>
     <p style="margin-top:0.75rem;font-size:0.8rem;color:var(--mid)">${pending.length} pending payment${pending.length !== 1 ? 's' : ''} · Mark Paid sends a payment confirmation email · Remove sends a cancellation email.</p>`;
 }
 
-async function markPaidFromPending(regId, name) {
+async function markPaidFromPending(regId, name, packageType) {
   const res = await fetch(`/api/admin/registrations/${regId}/mark-paid`, { method: 'POST' });
   if (res.ok) {
+    const data = await res.json();
     const alert = document.getElementById('dashboardAlert');
     alert.className = 'alert alert-success';
-    alert.textContent = `Payment confirmed for ${name}. A confirmation email has been sent.`;
+    if (data.packageType === '4pack') {
+      alert.textContent = `4-class package confirmed for ${name}. 3 credits added to their account (${data.creditsRemaining} total remaining). Confirmation email sent.`;
+    } else {
+      alert.textContent = `Payment confirmed for ${name}. A confirmation email has been sent.`;
+    }
     alert.style.display = 'block';
     loadDashboard();
   }
@@ -729,6 +740,7 @@ function renderAllUsers(users) {
           <th style="padding:8px 12px">Name</th>
           <th style="padding:8px 12px">Email</th>
           <th style="padding:8px 12px">Admin</th>
+          <th style="padding:8px 12px">Credits</th>
           <th style="padding:8px 12px">Waiver</th>
           <th style="padding:8px 12px">Signed</th>
           <th style="padding:8px 12px">Confirmation</th>
@@ -742,6 +754,12 @@ function renderAllUsers(users) {
             <td style="padding:10px 12px;font-weight:600">${u.first_name} ${u.last_name}</td>
             <td style="padding:10px 12px">${u.email}</td>
             <td style="padding:10px 12px;text-align:center">${u.is_admin ? '<span style="color:#2e7d32;font-weight:700">✓</span>' : '<span style="color:#ccc">—</span>'}</td>
+            <td style="padding:10px 12px">
+              <div style="display:flex;align-items:center;gap:0.4rem">
+                <span style="background:${u.credit_balance > 0 ? '#e8f5e9' : '#f5f5f5'};color:${u.credit_balance > 0 ? '#2e7d32' : '#999'};padding:2px 10px;border-radius:12px;font-size:0.78rem;font-weight:700">${u.credit_balance ?? 0}</span>
+                <button onclick="adjustCredits('${u.id}', '${u.first_name} ${u.last_name}', ${u.credit_balance ?? 0})" style="background:none;border:none;color:var(--mid);cursor:pointer;font-size:0.75rem;padding:0;text-decoration:underline">edit</button>
+              </div>
+            </td>
             <td style="padding:10px 12px">
               ${u.waiver_id
                 ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 10px;border-radius:12px;font-size:0.78rem;font-weight:600">Signed</span>'
@@ -1000,6 +1018,38 @@ async function deleteUser(userId, name, email) {
     const data = await res.json();
     alert.className = 'alert alert-error';
     alert.textContent = data.error || 'Failed to delete user.';
+    alert.style.display = 'block';
+  }
+}
+
+async function adjustCredits(userId, name, currentBalance) {
+  const input = prompt(`Adjust class credits for ${name}.\nCurrent balance: ${currentBalance}\n\nEnter new balance (or +2 / -1 to adjust):`);
+  if (input === null) return;
+  let adjustment;
+  const trimmed = input.trim();
+  if (trimmed.startsWith('+') || trimmed.startsWith('-')) {
+    adjustment = parseInt(trimmed);
+  } else {
+    const newBalance = parseInt(trimmed);
+    if (isNaN(newBalance)) return alert('Invalid value.');
+    adjustment = newBalance - currentBalance;
+  }
+  if (isNaN(adjustment)) return alert('Invalid value.');
+  const alert = document.getElementById('dashboardAlert');
+  const res = await fetch(`/api/admin/users/${userId}/credits`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adjustment })
+  });
+  if (res.ok) {
+    const data = await res.json();
+    alert.className = 'alert alert-success';
+    alert.textContent = `Credits for ${name} updated to ${data.balance}.`;
+    alert.style.display = 'block';
+    loadAdminUsers();
+  } else {
+    alert.className = 'alert alert-error';
+    alert.textContent = 'Failed to update credits.';
     alert.style.display = 'block';
   }
 }
