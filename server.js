@@ -121,10 +121,7 @@ function emailWrap({ heading, subtitle, detailRows, body, buttonLabel, buttonUrl
           <a href="${buttonUrl}" style="display:inline-block;background:#820000;color:#fff;padding:14px 40px;border-radius:50px;text-decoration:none;font-weight:700;font-size:15px;letter-spacing:0.03em">${buttonLabel}</a>
         </div>` : '<div style="padding:0 0 36px"></div>'}
       </div>
-      <div style="text-align:center;padding:24px 0 0">
-        <p style="font-size:13px;color:#6b6b6b;margin:0 0 4px">Red Maple Movement</p>
-        <a href="${APP_URL}" style="font-size:13px;color:#820000;text-decoration:none">redmaplemovement.ca</a>
-      </div>
+      <div style="padding:0 0 12px"></div>
     </div>`;
 }
 
