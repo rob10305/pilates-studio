@@ -172,9 +172,20 @@ let mode = 'signin';
 
 const params = new URLSearchParams(window.location.search);
 const oauthErr = params.get('error');
-// window.safeReturnTo (from auth.js) strips any absolute/protocol-relative
-// URL so an attacker can't turn the login redirect into an open redirect.
-const returnToPage = window.safeReturnTo(params.get('returnTo'), '/my-schedule.html');
+
+// Sanitise ?returnTo= so an attacker can't turn a login redirect into an open
+// redirect to their own site. Defined inline (not imported from auth.js) because
+// this script block runs before auth.js loads at the end of the body.
+function safeReturnTo(raw, fallback) {
+  var DEFAULT = fallback || '/my-schedule.html';
+  if (typeof raw !== 'string' || !raw) return DEFAULT;
+  var v = raw.trim();
+  if (!v) return DEFAULT;
+  if (/^[a-z][a-z0-9+.\-]*:/i.test(v)) return DEFAULT;   // http:, javascript:, data: etc.
+  if (v.startsWith('//') || v.startsWith('\\')) return DEFAULT;
+  return v.startsWith('/') ? v : '/' + v;
+}
+const returnToPage = safeReturnTo(params.get('returnTo'), '/my-schedule.html');
 
 // Show cart summary if arriving from schedule checkout
 const cartData = JSON.parse(sessionStorage.getItem('scheduleCart') || 'null');
