@@ -105,7 +105,7 @@ window.safeReturnTo = function (raw, fallback) {
     { q: 'What should I wear?', a: 'Comfortable clothing you can move freely in — think leggings, fitted tops, and grip socks (optional but recommended).' },
     { q: 'I\'m a complete beginner — is that okay?', a: 'Absolutely. Our classes are designed to be welcoming and suitable for all levels. Your instructor will offer modifications throughout.' },
     { q: 'How do I cancel or reschedule?', a: 'You can cancel from your <a href="my-schedule.html" style="color:var(--red)">My Account</a> page or via the link in your confirmation email. Cancellations more than 24 hours before class are fully refundable.' },
-    { q: 'Where is the studio located?', a: '43 Main Street South, Suite 2B, Campbellville, ON. Free parking is available on site.' },
+    { q: 'Where is the studio located?', a: '43 Main Street South, Suite 2B, Campbellville, ON, inside Glow By Nelly. Ample free parking available.' },
   ];
   var faqHtml = '<section class="faq-section">' +
     '<h2 style="font-family:\'Playfair Display\',Georgia,serif;font-size:1.6rem;text-align:center;margin-bottom:2rem;color:var(--charcoal)">Frequently Asked Questions</h2>' +
