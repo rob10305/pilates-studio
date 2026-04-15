@@ -1223,16 +1223,35 @@ async function createApp() {
   // Admin: mark a registration as paid
   app.post('/api/admin/registrations/:id/mark-paid', requireAdmin, async (req, res) => {
     try {
-      const { rows } = await pool.query(
-        `SELECT r.*, c.title, c.date, c.time, c.instructor, c.duration
-         FROM registrations r JOIN classes c ON c.id = r."classId"
-         WHERE r.id = $1`, [req.params.id]
+      // Atomic, idempotent transition: only flip to 'paid' if currently not 'paid'.
+      // RETURNING the row tells us whether a state change actually happened — if no row
+      // is returned it means the registration was already paid (or doesn't exist) and
+      // we must NOT re-grant credits or re-send confirmation emails.
+      const { rows: updated } = await pool.query(
+        `UPDATE registrations SET payment_status = 'paid'
+         WHERE id = $1 AND payment_status != 'paid'
+         RETURNING id, "firstName", "lastName", email, "classId", package_type, user_id`,
+        [req.params.id]
       );
-      if (!rows.length) return res.status(404).json({ error: 'Registration not found' });
-      const reg = rows[0];
-      const cls = { title: reg.title, date: reg.date, time: reg.time, instructor: reg.instructor, duration: reg.duration };
 
-      await pool.query(`UPDATE registrations SET payment_status = 'paid' WHERE id = $1`, [req.params.id]);
+      if (!updated.length) {
+        // Either already paid or not found — distinguish so the UI can refresh cleanly
+        const { rows: existing } = await pool.query(
+          `SELECT payment_status FROM registrations WHERE id = $1`,
+          [req.params.id]
+        );
+        if (!existing.length) return res.status(404).json({ error: 'Registration not found' });
+        return res.status(200).json({ success: true, alreadyPaid: true });
+      }
+
+      const reg = updated[0];
+
+      // Fetch class details for the email
+      const { rows: clsRows } = await pool.query(
+        `SELECT title, date, time, instructor, duration FROM classes WHERE id = $1`,
+        [reg.classId]
+      );
+      const cls = clsRows[0] || { title: '(class removed)', date: '', time: '', instructor: '', duration: 0 };
 
       // 4-pack: add 3 credits (1 used for this class, 3 carry forward)
       if (reg.package_type === '4pack') {
