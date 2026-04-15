@@ -191,6 +191,33 @@ async function getSetting(key) {
   } catch { return null; }
 }
 
+// Copy a registration into the cancelled_registrations archive.
+// Call BEFORE deleting the registration row so class details are still joinable.
+// `cancelledBy` is a free-form label: 'user', 'admin', 'email-link', 'unpaid-release', 'user-deleted'.
+async function archiveRegistration(registrationId, cancelledBy = 'user') {
+  try {
+    await pool.query(`
+      INSERT INTO cancelled_registrations (
+        id, "classId", "firstName", "lastName", email, phone,
+        "registeredAt", user_id, package_type, payment_status,
+        class_title, class_date, class_time, class_instructor,
+        cancelled_at, cancelled_by
+      )
+      SELECT r.id, r."classId", r."firstName", r."lastName", r.email, r.phone,
+             r."registeredAt", r.user_id, r.package_type, r.payment_status,
+             c.title, c.date, c.time, c.instructor,
+             NOW(), $2
+      FROM registrations r
+      LEFT JOIN classes c ON c.id = r."classId"
+      WHERE r.id = $1
+      ON CONFLICT (id) DO NOTHING
+    `, [registrationId, cancelledBy]);
+  } catch (e) {
+    console.error('archiveRegistration failed for', registrationId, e.message);
+    // Swallow — we don't want archiving failures to block the actual cancellation
+  }
+}
+
 async function sendAdminPaymentAlertEmail({ notifyEmail, unpaidList }) {
   if (!notifyEmail || !process.env.RESEND_API_KEY) return;
   const rows = unpaidList.map(({ reg, cls }) => {
@@ -498,6 +525,31 @@ async function initDB() {
       balance    INTEGER NOT NULL DEFAULT 0,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  // Cancelled registrations archive — preserves a record of cancelled bookings
+  // so admin can see the full booking history for a user (registered / cancelled / attended)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cancelled_registrations (
+      id             TEXT PRIMARY KEY,
+      "classId"      TEXT,
+      "firstName"    TEXT NOT NULL,
+      "lastName"     TEXT NOT NULL,
+      email          TEXT NOT NULL,
+      phone          TEXT NOT NULL DEFAULT '',
+      "registeredAt" TEXT NOT NULL,
+      user_id        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      package_type   TEXT NOT NULL DEFAULT 'single',
+      payment_status TEXT NOT NULL DEFAULT 'pending',
+      class_title    TEXT,
+      class_date     TEXT,
+      class_time     TEXT,
+      class_instructor TEXT,
+      cancelled_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      cancelled_by   TEXT NOT NULL DEFAULT 'user'
+    );
+    CREATE INDEX IF NOT EXISTS idx_cancelled_user ON cancelled_registrations(user_id);
+    CREATE INDEX IF NOT EXISTS idx_cancelled_email ON cancelled_registrations(LOWER(email));
   `);
 
 }
@@ -935,6 +987,7 @@ async function createApp() {
       const classStart = new Date(`${reg.date}T${reg.time}`);
       const hoursUntilClass = (classStart - new Date()) / (1000 * 60 * 60);
       const refundEligible = hoursUntilClass > 24;
+      await archiveRegistration(req.params.id, 'user');
       await pool.query('DELETE FROM registrations WHERE id = $1', [req.params.id]);
       res.json({ success: true, refundEligible });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
@@ -986,10 +1039,80 @@ async function createApp() {
       if (req.user && String(req.user.id) === String(userId)) {
         return res.status(400).json({ error: 'You cannot delete your own account.' });
       }
+      // Archive all of this user's registrations before deleting the account
+      const { rows: userRegs } = await pool.query('SELECT id FROM registrations WHERE user_id = $1', [userId]);
+      for (const r of userRegs) await archiveRegistration(r.id, 'user-deleted');
       await pool.query('DELETE FROM registrations WHERE user_id = $1', [userId]);
       const { rowCount } = await pool.query('DELETE FROM users WHERE id = $1', [userId]);
       if (rowCount === 0) return res.status(404).json({ error: 'User not found.' });
       res.json({ success: true });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Admin: full booking history for a user (upcoming, past, cancelled, bundle summary)
+  app.get('/api/admin/users/:userId/bookings', requireAdmin, async (req, res) => {
+    const userId = req.params.userId;
+    try {
+      // Fetch the user so we can also look up records that were only ever linked by email
+      const { rows: userRows } = await pool.query(
+        'SELECT id, email, first_name, last_name FROM users WHERE id = $1', [userId]
+      );
+      if (!userRows.length) return res.status(404).json({ error: 'User not found' });
+      const user = userRows[0];
+
+      // Active registrations (upcoming and past) — match by user_id OR email for legacy rows
+      const { rows: active } = await pool.query(`
+        SELECT r.id, r."classId", r."registeredAt", r.payment_status, r.package_type,
+               c.title, c.date, c.time, c.duration, c.instructor
+        FROM registrations r
+        LEFT JOIN classes c ON c.id = r."classId"
+        WHERE r.user_id = $1 OR LOWER(r.email) = LOWER($2)
+        ORDER BY c.date DESC NULLS LAST, c.time DESC NULLS LAST
+      `, [userId, user.email]);
+
+      // Cancelled archive
+      const { rows: cancelled } = await pool.query(`
+        SELECT id, "classId", "registeredAt", payment_status, package_type,
+               class_title AS title, class_date AS date, class_time AS time,
+               class_instructor AS instructor, cancelled_at, cancelled_by
+        FROM cancelled_registrations
+        WHERE user_id = $1 OR LOWER(email) = LOWER($2)
+        ORDER BY cancelled_at DESC
+      `, [userId, user.email]);
+
+      // Split active into upcoming vs. past using today's date
+      const today = new Date().toISOString().slice(0, 10);
+      const nowTime = new Date();
+      const upcoming = [];
+      const past = [];
+      for (const r of active) {
+        if (!r.date) { upcoming.push(r); continue; }
+        const classStart = new Date(`${r.date}T${r.time || '00:00'}`);
+        if (classStart >= nowTime) upcoming.push(r); else past.push(r);
+      }
+
+      // Bundle summary — count historical 4-pack purchases across active + cancelled
+      const bundleCount =
+        active.filter(r => r.package_type === '4pack').length +
+        cancelled.filter(r => r.package_type === '4pack').length;
+
+      // Current credit balance
+      const { rows: cr } = await pool.query(
+        'SELECT balance FROM user_credits WHERE user_id = $1', [userId]
+      );
+      const creditBalance = cr.length ? cr[0].balance : 0;
+
+      res.json({
+        user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name },
+        creditBalance,
+        bundleCount,
+        totals: {
+          upcoming: upcoming.length,
+          past: past.length,
+          cancelled: cancelled.length
+        },
+        upcoming, past, cancelled
+      });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
@@ -1054,6 +1177,7 @@ async function createApp() {
       `, [req.params.id]);
       if (!rows.length) return res.status(404).json({ error: 'Registration not found' });
       const reg = rows[0];
+      await archiveRegistration(req.params.id, 'admin');
       await pool.query('DELETE FROM registrations WHERE id = $1', [req.params.id]);
       res.json({ success: true });
       sendRemovalEmail({
@@ -1081,6 +1205,7 @@ async function createApp() {
       const hoursUntilClass = (classStart - new Date()) / (1000 * 60 * 60);
       const refundEligible = hoursUntilClass > 24;
 
+      await archiveRegistration(id, 'email-link');
       await pool.query('DELETE FROM registrations WHERE id = $1', [id]);
 
       const refundNote = refundEligible
@@ -1200,6 +1325,8 @@ async function createApp() {
       return res.status(403).send(actionPage('Invalid or expired link.', false));
     }
     try {
+      // Archive first (only archives if the row still exists and is pending)
+      await archiveRegistration(id, 'unpaid-release');
       const { rows } = await pool.query(
         `DELETE FROM registrations WHERE id = $1 AND payment_status = 'pending'
          RETURNING "firstName", "lastName", email, "classId"`,
