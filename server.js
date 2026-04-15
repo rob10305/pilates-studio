@@ -1462,14 +1462,16 @@ async function createApp() {
     passport.authenticate('google', (err, user) => {
       if (err) { console.error('Google auth error:', err.message || err); return res.redirect('/login.html?error=google'); }
       if (!user) { console.error('Google auth: no user returned'); return res.redirect('/login.html?error=google'); }
+      // ⚠ Capture authReturnTo BEFORE req.login. Passport 0.6+ regenerates
+      // the session inside req.login for session-fixation protection, which
+      // would otherwise wipe our authReturnTo and cause the user to land
+      // on '/' instead of the intended destination (register.html, etc.).
+      const returnTo = safeReturnTo(req.session.authReturnTo);
+      delete req.session.authReturnTo;
       req.login(user, (loginErr) => {
         if (loginErr) { console.error('Google login error:', loginErr.message || loginErr); return res.redirect('/login.html?error=google'); }
-        const returnTo = safeReturnTo(req.session.authReturnTo);
-        delete req.session.authReturnTo;
-        // Explicitly save the session before redirecting. Without this,
-        // express-session writes the row asynchronously and the browser can
-        // hit the destination page (calling /auth/me) before the session
-        // exists in Postgres — producing a momentary "not signed in" flash.
+        // Explicit save so the new (post-regeneration) session is in Postgres
+        // before the browser follows the redirect.
         req.session.save(saveErr => {
           if (saveErr) console.error('Google session save error:', saveErr.message);
           return res.redirect(returnTo);
@@ -1496,10 +1498,11 @@ async function createApp() {
     passport.authenticate('facebook', (err, user) => {
       if (err)   { console.error('Facebook auth error:', err.message || err); return res.redirect('/login.html?error=facebook'); }
       if (!user) { console.error('Facebook auth: no user returned'); return res.redirect('/login.html?error=facebook'); }
+      // Capture authReturnTo BEFORE req.login (see Google callback comment)
+      const returnTo = safeReturnTo(req.session.authReturnTo);
+      delete req.session.authReturnTo;
       req.login(user, (loginErr) => {
         if (loginErr) { console.error('Facebook login error:', loginErr.message || loginErr); return res.redirect('/login.html?error=facebook'); }
-        const returnTo = safeReturnTo(req.session.authReturnTo);
-        delete req.session.authReturnTo;
         req.session.save(saveErr => {
           if (saveErr) console.error('Facebook session save error:', saveErr.message);
           return res.redirect(returnTo);
