@@ -1077,13 +1077,24 @@ async function createApp() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://www.clarity.ms', 'https://*.clarity.ms', 'https://*.vercel-insights.com'],
+        // Third-party scripts: jsDelivr (Chart.js admin, jsPDF waiver),
+        // Clarity (opt-in analytics), Vercel Insights, and the Google Maps JS
+        // API used by the admin location-autocomplete (maps.googleapis.com
+        // serves the API loader, maps.gstatic.com serves sub-scripts it pulls).
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://www.clarity.ms', 'https://*.clarity.ms', 'https://*.vercel-insights.com', 'https://maps.googleapis.com', 'https://maps.gstatic.com'],
         scriptSrcAttr: ["'unsafe-inline'"],  // allows onclick= etc. used in legacy pages
+        // Google Fonts for typography; Google Maps injects a few inline styles.
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        // 'https:' for imgSrc is intentionally broad — Google Maps tiles,
+        // Clarity trackers, and the studio's own CDN assets all load images
+        // from varying origins we don't control.
         imgSrc: ["'self'", 'data:', 'https:'],
         mediaSrc: ["'self'"],
-        connectSrc: ["'self'", 'https://*.clarity.ms', 'https://*.vercel-insights.com'],
+        // connect-src controls XHR/fetch/WebSocket destinations. Places API
+        // does runtime autocomplete fetches to maps.googleapis.com, and the
+        // Maps JS API also chatters with maps.gstatic.com and google.com.
+        connectSrc: ["'self'", 'https://*.clarity.ms', 'https://*.vercel-insights.com', 'https://maps.googleapis.com', 'https://maps.gstatic.com', 'https://www.google.com'],
         // frame-src controls iframes embedded BY our pages. Without this,
         // default-src 'self' blocks the Google Maps studio-location embed on
         // schedule.html. frameAncestors below still prevents OTHER sites from
