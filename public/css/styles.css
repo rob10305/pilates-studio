@@ -60,7 +60,7 @@ nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 70px;
+  height: 120px;
 }
 
 .nav-logo {
@@ -74,7 +74,7 @@ nav {
   text-decoration: none;
 }
 
-.nav-logo-img { height: 52px; width: auto; flex-shrink: 0; }
+.nav-logo-img { height: 104px; width: auto; flex-shrink: 0; }
 .nav-logo span { color: var(--red); }
 
 .nav-links {
