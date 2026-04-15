@@ -567,14 +567,28 @@ async function doSubmit(packageType) {
   const extraFields = password ? { password } : {};
 
   if (cartClasses.length > 0) {
-    // Cart mode — submit each class in sequence
+    // Cart mode — submit each class in sequence. For drop-in ('single')
+    // multi-class bookings we generate one batchId shared across all calls
+    // so the server can send ONE combined email with the correct total and
+    // Mark Paid cascades to siblings. 4-pack / credit bookings don't use a
+    // batch (they already have coordinated payment handling).
     let successCount = 0;
     let lastCreditsRemaining;
     let lastError = '';
     let accountCreated = false;
+    const useBatch = packageType === 'single' && cartClasses.length > 1;
+    const batchId = useBatch
+      ? `b-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      : null;
 
     for (const cls of cartClasses) {
-      const body = { ...window._pendingBookingBody, classId: cls.id, packageType, ...extraFields };
+      const body = {
+        ...window._pendingBookingBody,
+        classId: cls.id,
+        packageType,
+        ...(batchId ? { batchId } : {}),
+        ...extraFields
+      };
       try {
         const res = await fetch('/api/register', {
           method: 'POST',
@@ -592,6 +606,15 @@ async function doSubmit(packageType) {
       } catch {
         lastError = 'Network error. Please check your connection.';
       }
+    }
+
+    // All calls succeeded? Trigger the single combined confirmation email
+    if (batchId && successCount === cartClasses.length) {
+      fetch('/api/register/batch-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batchId })
+      }).catch(() => { /* non-fatal — user still sees success UI */ });
     }
 
     if (successCount === cartClasses.length) {

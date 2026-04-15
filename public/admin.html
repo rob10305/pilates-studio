@@ -1685,13 +1685,21 @@ function renderPendingPayments(classes, registrations) {
         </tr>
       </thead>
       <tbody>
-        ${pending.map(r => {
+        ${(() => {
+          // Count how many pending siblings share each batch_id so the
+          // Mark Paid button can say 'covers all N classes'
+          const batchCounts = {};
+          pending.forEach(r => { if (r.batchId) batchCounts[r.batchId] = (batchCounts[r.batchId] || 0) + 1; });
+          return pending.map(r => {
           const pkg = r.packageType || 'single';
+          const batchSize = r.batchId ? batchCounts[r.batchId] : 0;
           const pkgBadge = pkg === '4pack'
             ? '<span style="background:#fff3cd;color:#856404;font-size:0.7rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:12px;white-space:nowrap">4-PACK · $85</span>'
-            : '<span style="background:#e8f5e9;color:#2e7d32;font-size:0.7rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:12px;white-space:nowrap">Single · $25</span>';
+            : batchSize > 1
+              ? `<span style="background:#e3f2fd;color:#1565c0;font-size:0.7rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:12px;white-space:nowrap">Drop-in batch · $${batchSize * 25} (${batchSize} classes)</span>`
+              : '<span style="background:#e8f5e9;color:#2e7d32;font-size:0.7rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:12px;white-space:nowrap">Single · $25</span>';
           return `
-          <tr style="border-bottom:1px solid #f0f0f0${pkg === '4pack' ? ';background:#fffdf0' : ''}">
+          <tr style="border-bottom:1px solid #f0f0f0${pkg === '4pack' ? ';background:#fffdf0' : ''}${batchSize > 1 ? ';background:#f5f9ff' : ''}">
             <td style="padding:10px 12px;font-weight:600">${r.firstName} ${r.lastName}</td>
             <td style="padding:10px 12px"><a href="mailto:${r.email}" style="color:var(--red)">${r.email}</a></td>
             <td style="padding:10px 12px">${pkgBadge}</td>
@@ -1707,7 +1715,8 @@ function renderPendingPayments(classes, registrations) {
               </div>
             </td>
           </tr>`;
-        }).join('')}
+          }).join('');
+        })()}
       </tbody>
     </table>
     <p style="margin-top:0.75rem;font-size:0.8rem;color:var(--mid)">${pending.length} pending payment${pending.length !== 1 ? 's' : ''} · Mark Paid sends a payment confirmation email · Remove sends a cancellation email.</p>`;
@@ -1738,6 +1747,8 @@ async function markPaidFromPending(regId, name, packageType) {
       alert.textContent = `${name}'s booking was already marked as paid — no changes made.`;
     } else if (data.packageType === '4pack') {
       alert.textContent = `4-class package confirmed for ${name}. 3 credits added to their account (${data.creditsRemaining} total remaining). Confirmation email sent.`;
+    } else if (data.classesPaid > 1) {
+      alert.textContent = `Payment confirmed for ${name} — all ${data.classesPaid} classes in this booking are now marked paid ($${data.classesPaid * 25} total). Confirmation email sent.`;
     } else {
       alert.textContent = `Payment confirmed for ${name}. A confirmation email has been sent.`;
     }

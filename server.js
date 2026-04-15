@@ -145,6 +145,56 @@ function waiverViewToken(waiverId) {
     .update(`waiver-${waiverId}`).digest('hex');
 }
 
+// Combined confirmation email for a multi-class drop-in batch. Sent once per
+// batch (instead of N per-class emails) so the user gets a single $25 × N
+// total ask with all classes listed, plus individual cancel links per class.
+async function sendBatchDropInConfirmation({ to, firstName, lastName, classes }) {
+  if (!process.env.RESEND_API_KEY) return;
+  const n       = classes.length;
+  const total   = n * 25;
+  const classesList = classes.map(c => {
+    const cancelUrl = `${APP_URL}/api/registrations/${c.registrationId}/cancel?token=${cancelToken(c.registrationId)}`;
+    return `
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #eee;vertical-align:top">
+          <p style="margin:0 0 2px;font-weight:700;color:#3a3a3a;font-size:14px">${c.title}</p>
+          <p style="margin:0;font-size:12px;color:#6b6b6b">${formatClassDate(c.date)} · ${formatClassTime(c.time)} · ${c.instructor || 'Amanda'}</p>
+        </td>
+        <td style="padding:10px 0 10px 12px;border-bottom:1px solid #eee;text-align:right;vertical-align:top;white-space:nowrap">
+          <p style="margin:0;font-weight:700;color:#3a3a3a;font-size:14px">$25 CAD</p>
+          <a href="${cancelUrl}" style="font-size:11px;color:#820000">Cancel this</a>
+        </td>
+      </tr>`;
+  }).join('');
+
+  await getResend().emails.send({
+    from: FROM_ADDRESS,
+    to,
+    subject: `Booking Confirmed (${n} classes): ${formatClassDate(classes[0].date)}${n > 1 ? ` and ${n - 1} more` : ''}`,
+    html: emailWrap({
+      heading: `Booking Confirmed — ${n} classes`,
+      subtitle: `Your ${n} spots are reserved. Please complete payment to confirm them.`,
+      detailRows: [
+        ['Name',  `${firstName} ${lastName}`],
+        ['Email', to],
+        ['Classes booked', `${n} class${n === 1 ? '' : 'es'}`]
+      ],
+      body: `
+        <table style="width:100%;border-collapse:collapse;margin:0 0 16px">${classesList}</table>
+        <div style="background:#FAF7F2;border:1px solid #e8e3dd;border-radius:8px;padding:16px;margin-bottom:8px">
+          <p style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#6b6b6b;margin:0 0 4px;font-weight:700">SECURE YOUR ${n} SPOTS</p>
+          <p style="font-family:Georgia,serif;font-size:22px;color:#820000;font-weight:700;margin:0 0 6px">$${total} CAD</p>
+          <p style="font-size:13px;color:#6b6b6b;margin:0 0 2px">${n} × $25 drop-in · Send via Interac e-Transfer to</p>
+          <p style="font-size:15px;font-weight:700;color:#3a3a3a;margin:0">amanda@redmaplemovement.ca</p>
+          <p style="font-size:12px;color:#6b6b6b;margin:8px 0 0">Include your name in the e-Transfer message.</p>
+        </div>
+        <p style="font-size:12px;color:#b0b0b0;margin:8px 0 0">Your spots are held for 1 hour pending payment. <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>`,
+      buttonLabel: 'Manage My Schedule',
+      buttonUrl: `${APP_URL}/my-schedule.html`
+    })
+  });
+}
+
 async function sendWaiverConfirmationEmail({ to, firstName, waiverId, signedAt }) {
   if (!process.env.RESEND_API_KEY) return;
   const viewUrl = `${APP_URL}/api/waiver/view/${waiverId}?token=${waiverViewToken(waiverId)}`;
@@ -468,17 +518,16 @@ async function sendAdminPaymentAlertEmail({ notifyEmail, unpaidList }) {
     const confirmUrl = `${APP_URL}/api/admin/payment-action/${reg.id}/confirm?token=${paymentActionToken(reg.id, 'confirm')}`;
     const releaseUrl = `${APP_URL}/api/admin/payment-action/${reg.id}/release?token=${paymentActionToken(reg.id, 'release')}`;
     return `
-      <div style="border:1px solid #e0e0e0;border-radius:6px;padding:20px;margin-bottom:20px">
-        <p style="margin:0 0 4px;font-size:16px;font-weight:bold">${reg.firstName} ${reg.lastName}</p>
-        <p style="margin:0 0 2px;font-size:13px;color:#555">${reg.email} &nbsp;·&nbsp; ${reg.phone || '—'}</p>
-        <p style="margin:4px 0 12px;font-size:13px">
-          <strong>${cls ? cls.title : 'Unknown class'}</strong>
-          ${cls ? ` — ${formatClassDate(cls.date)} at ${formatClassTime(cls.time)}` : ''}
+      <div style="background:#FAF7F2;border:1px solid #e8e3dd;border-radius:8px;padding:16px;margin:0 0 12px">
+        <p style="margin:0 0 4px;font-size:15px;font-weight:700;color:#3a3a3a">${reg.firstName} ${reg.lastName}</p>
+        <p style="margin:0 0 4px;font-size:13px;color:#6b6b6b">${reg.email}${reg.phone ? ' · ' + reg.phone : ''}</p>
+        <p style="margin:0 0 4px;font-size:13px;color:#3a3a3a">
+          <strong>${cls ? cls.title : 'Unknown class'}</strong>${cls ? ` — ${formatClassDate(cls.date)} at ${formatClassTime(cls.time)}` : ''}
         </p>
-        <p style="margin:0 0 12px;font-size:12px;color:#888">Registered: ${new Date(reg.registeredAt).toLocaleString('en-CA')}</p>
-        <div style="display:flex;gap:12px;flex-wrap:wrap">
-          <a href="${confirmUrl}" style="display:inline-block;background:#2d6a2d;color:#fff;padding:10px 22px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:14px">✅ Payment Received</a>
-          <a href="${releaseUrl}" style="display:inline-block;background:#820000;color:#fff;padding:10px 22px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:14px">❌ No Payment — Remove</a>
+        <p style="margin:0 0 12px;font-size:11px;color:#b0b0b0">Booked ${new Date(reg.registeredAt).toLocaleString('en-CA')}</p>
+        <div>
+          <a href="${confirmUrl}" style="display:inline-block;background:#2d6a2d;color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;font-weight:700;font-size:13px;margin-right:8px">✅ Payment Received</a>
+          <a href="${releaseUrl}" style="display:inline-block;background:#820000;color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;font-weight:700;font-size:13px">❌ No Payment — Remove</a>
         </div>
       </div>`;
   }).join('');
@@ -487,41 +536,55 @@ async function sendAdminPaymentAlertEmail({ notifyEmail, unpaidList }) {
     from: FROM_ADDRESS,
     to: notifyEmail,
     subject: `Payment Alert: ${unpaidList.length} unpaid booking${unpaidList.length > 1 ? 's' : ''} require your attention`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;color:#333">
-        <div style="background:#820000;padding:24px;text-align:center">
-          <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
-        </div>
-        <div style="padding:32px">
-          <h2 style="color:#820000;margin-top:0">Payment Required — Action Needed</h2>
-          <p>The following ${unpaidList.length > 1 ? `<strong>${unpaidList.length} bookings have</strong>` : 'booking has'} been pending for over 1 hour without recorded payment. Please confirm or remove each registration.</p>
-          ${rows}
-          <p style="font-size:12px;color:#999;margin-top:24px">Each button above is a one-click action — no login required. Clicking "Payment Received" marks the booking as paid and sends a confirmation to the attendee. Clicking "No Payment — Remove" cancels the booking and notifies the attendee.</p>
-        </div>
-        <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
-          Red Maple Movement &mdash; <a href="${APP_URL}/admin.html" style="color:#820000">Admin Dashboard</a>
-        </div>
-      </div>`
+    html: emailWrap({
+      heading: 'Payment Required — Action Needed',
+      subtitle: unpaidList.length > 1
+        ? `${unpaidList.length} bookings have been pending for over 1 hour without payment. Please confirm or remove each below.`
+        : `This booking has been pending for over 1 hour without payment. Please confirm or remove it below.`,
+      detailRows: [],
+      body:
+        rows +
+        `<p style="font-size:12px;color:#b0b0b0;margin:12px 0 0">One-click actions — no login required. Payment Received marks as paid + emails the guest. Remove cancels + notifies the guest.</p>`,
+      buttonLabel: 'Open Admin Dashboard',
+      buttonUrl: `${APP_URL}/admin.html`
+    })
   });
 }
 
-async function sendPaymentConfirmedEmail({ to, firstName, cls }) {
+async function sendPaymentConfirmedEmail({ to, firstName, cls, classes }) {
   if (!process.env.RESEND_API_KEY) return;
+  // If `classes` is passed in (batch-paid drop-in), the email lists all of
+  // them. Otherwise falls back to the single-class layout.
+  const multi = Array.isArray(classes) && classes.length > 1;
+  const classListHtml = multi
+    ? `<table style="width:100%;border-collapse:collapse;margin:0 0 16px">${classes.map(c => `
+        <tr><td style="padding:10px 0;border-bottom:1px solid #eee;vertical-align:top">
+          <p style="margin:0 0 2px;font-weight:700;color:#3a3a3a;font-size:14px">${c.title}</p>
+          <p style="margin:0;font-size:12px;color:#6b6b6b">${formatClassDate(c.date)} · ${formatClassTime(c.time)} · ${c.instructor || 'Amanda'}</p>
+        </td></tr>`).join('')}</table>`
+    : '';
   await getResend().emails.send({
     from: FROM_ADDRESS,
     to,
-    subject: `Payment Confirmed — See you in ${cls.title}!`,
+    subject: multi
+      ? `Payment Confirmed — ${classes.length} classes booked`
+      : `Payment Confirmed — See you in ${cls.title}!`,
     html: emailWrap({
       heading: `Payment Confirmed`,
-      subtitle: `You're all set, ${firstName}! We can't wait to see you on the mat.`,
-      detailRows: [
-        ['Class', cls.title],
-        ['Date', formatClassDate(cls.date)],
-        ['Time', formatClassTime(cls.time)],
-        ['Instructor', cls.instructor],
-        ['Duration', `${cls.duration} minutes`],
-      ],
-      body: `<p style="font-size:13px;color:#b0b0b0">Cancellations more than 24 hours before class are fully refundable. <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>`,
+      subtitle: multi
+        ? `You're all set, ${firstName}! Payment received for all ${classes.length} classes.`
+        : `You're all set, ${firstName}! We can't wait to see you on the mat.`,
+      detailRows: multi
+        ? [['Classes paid', `${classes.length} × $25 = $${classes.length * 25} CAD`]]
+        : [
+            ['Class', cls.title],
+            ['Date', formatClassDate(cls.date)],
+            ['Time', formatClassTime(cls.time)],
+            ['Instructor', cls.instructor],
+            ['Duration', `${cls.duration} minutes`],
+          ],
+      body: classListHtml +
+        `<p style="font-size:13px;color:#b0b0b0">Cancellations more than 24 hours before class are fully refundable. <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>`,
       buttonLabel: 'View My Schedule',
       buttonUrl: `${APP_URL}/my-schedule.html`
     })
@@ -557,29 +620,22 @@ async function sendNewBookingNotification({ notifyEmail, registrant, cls }) {
     from: FROM_ADDRESS,
     to: notifyEmail,
     subject: `New Booking: ${registrant.firstName} ${registrant.lastName} — ${cls.title}`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333">
-        <div style="background:#8B1A1A;padding:24px;text-align:center">
-          <h1 style="color:#fff;margin:0;font-size:24px">Red Maple Movement</h1>
-        </div>
-        <div style="padding:32px">
-          <h2 style="color:#8B1A1A">New Class Booking</h2>
-          <p>A new registration has been received:</p>
-          <div style="background:#f9f9f9;border-left:4px solid #8B1A1A;padding:16px;margin:24px 0;border-radius:4px">
-            <p style="margin:4px 0"><strong>Name:</strong> ${registrant.firstName} ${registrant.lastName}</p>
-            <p style="margin:4px 0"><strong>Email:</strong> ${registrant.email}</p>
-            <p style="margin:4px 0"><strong>Phone:</strong> ${registrant.phone || '—'}</p>
-            <p style="margin:4px 0"><strong>Class:</strong> ${cls.title}</p>
-            <p style="margin:4px 0"><strong>Date:</strong> ${formatClassDate(cls.date)}</p>
-            <p style="margin:4px 0"><strong>Time:</strong> ${formatClassTime(cls.time)}</p>
-            <p style="margin:4px 0"><strong>Instructor:</strong> ${cls.instructor}</p>
-          </div>
-          <a href="${APP_URL}/admin.html" style="display:inline-block;background:#8B1A1A;color:#fff;padding:12px 28px;border-radius:4px;text-decoration:none;font-weight:bold">View Admin Dashboard</a>
-        </div>
-        <div style="background:#f0f0f0;padding:16px;text-align:center;font-size:12px;color:#666">
-          Red Maple Movement &mdash; <a href="${APP_URL}" style="color:#8B1A1A">${APP_URL}</a>
-        </div>
-      </div>`
+    html: emailWrap({
+      heading: 'New Class Booking',
+      subtitle: `A new registration has just been received for ${cls.title}.`,
+      detailRows: [
+        ['Name',       `${registrant.firstName} ${registrant.lastName}`],
+        ['Email',      registrant.email],
+        ['Phone',      registrant.phone || '—'],
+        ['Class',      cls.title],
+        ['Date',       formatClassDate(cls.date)],
+        ['Time',       formatClassTime(cls.time)],
+        ['Instructor', cls.instructor || 'Amanda']
+      ],
+      body: `<p style="font-size:13px;color:#6b6b6b;margin:0">Open the admin dashboard to mark payment received, view the roster, or message this guest.</p>`,
+      buttonLabel: 'Open Admin Dashboard',
+      buttonUrl: `${APP_URL}/admin.html`
+    })
   });
 }
 
@@ -788,6 +844,15 @@ async function initDB() {
   // Add package_type column — 'single', '4pack', or 'credit'
   await pool.query(`
     ALTER TABLE registrations ADD COLUMN IF NOT EXISTS package_type TEXT NOT NULL DEFAULT 'single';
+  `);
+
+  // batch_id — groups sibling registrations created from a single multi-class
+  // cart submission. Used so the user gets ONE combined confirmation email
+  // ($25 × N total) instead of N separate emails, and so admin Mark Paid
+  // flips all siblings at once.
+  await pool.query(`
+    ALTER TABLE registrations ADD COLUMN IF NOT EXISTS batch_id TEXT;
+    CREATE INDEX IF NOT EXISTS idx_registrations_batch ON registrations(batch_id) WHERE batch_id IS NOT NULL;
   `);
 
   // Add user_id column to registrations for linking to the credits system
@@ -1451,7 +1516,7 @@ async function createApp() {
   });
 
   app.post('/api/register', async (req, res) => {
-    const { classId, firstName, lastName, email, phone, packageType, password } = req.body;
+    const { classId, firstName, lastName, email, phone, packageType, password, batchId } = req.body;
     if (!classId || !firstName || !lastName || !email)
       return res.status(400).json({ error: 'Missing required fields' });
     if (!req.isAuthenticated() && (!password || password.length < 8))
@@ -1534,17 +1599,75 @@ async function createApp() {
 
       // ── 4-pack or single: create pending registration ──────────
       const pkgType = packageType === '4pack' ? '4pack' : 'single';
+      // Batch drop-in registrations share a batch_id so the user gets one
+      // combined confirmation email + admin Mark Paid flips all siblings.
+      // Only stored for 'single' (drop-in) bookings — 4-pack is a single
+      // payment by design.
+      const effectiveBatchId = (pkgType === 'single' && batchId) ? String(batchId) : null;
       await pool.query(
-        `INSERT INTO registrations (id,"classId","firstName","lastName",email,phone,"registeredAt",payment_status,package_type,user_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9)`,
-        [registrationId, classId, firstName, lastName, email, phone || '', new Date().toISOString(), pkgType, userId]
+        `INSERT INTO registrations (id,"classId","firstName","lastName",email,phone,"registeredAt",payment_status,package_type,user_id,batch_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9,$10)`,
+        [registrationId, classId, firstName, lastName, email, phone || '', new Date().toISOString(), pkgType, userId, effectiveBatchId]
       );
-      res.status(201).json({ success: true, registrationId, packageType: pkgType, accountCreated });
-      sendConfirmationEmail({ to: email, firstName, lastName, cls, registrationId, packageType: pkgType }).catch(e => console.error('Confirmation email error:', e.message));
-      getSetting('booking_notify_email').then(notifyEmail => {
-        if (notifyEmail) sendNewBookingNotification({ notifyEmail, registrant: { firstName, lastName, email, phone }, cls }).catch(e => console.error('Notify email error:', e.message));
-      });
+      res.status(201).json({ success: true, registrationId, packageType: pkgType, batchId: effectiveBatchId, accountCreated });
+      // Skip the per-class confirmation email if this booking is part of a
+      // batch — the client will hit /api/register/batch-confirmation once
+      // after the whole batch is created to send ONE combined email.
+      if (!effectiveBatchId) {
+        sendConfirmationEmail({ to: email, firstName, lastName, cls, registrationId, packageType: pkgType })
+          .catch(e => console.error('Confirmation email error:', e.message));
+      }
+      // Admin notification — deferred for batched bookings; sent as a single
+      // combined admin notice by /api/register/batch-confirmation instead
+      if (!effectiveBatchId) {
+        getSetting('booking_notify_email').then(notifyEmail => {
+          if (notifyEmail) sendNewBookingNotification({ notifyEmail, registrant: { firstName, lastName, email, phone }, cls })
+            .catch(e => console.error('Notify email error:', e.message));
+        });
+      }
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Called by the client once after a cart's worth of /api/register calls
+  // succeed — sends ONE combined confirmation email for all drop-in classes
+  // in that batch instead of N per-class emails.
+  app.post('/api/register/batch-confirmation', async (req, res) => {
+    const { batchId } = req.body || {};
+    if (!batchId) return res.status(400).json({ error: 'batchId required' });
+    try {
+      const { rows } = await pool.query(`
+        SELECT r.id AS "registrationId", r."firstName", r."lastName", r.email, r.phone,
+               c.title, c.date, c.time, c.instructor
+        FROM registrations r
+        JOIN classes c ON c.id = r."classId"
+        WHERE r.batch_id = $1
+        ORDER BY c.date ASC, c.time ASC
+      `, [batchId]);
+      if (!rows.length) return res.status(404).json({ error: 'No registrations found for this batch' });
+      const { firstName, lastName, email, phone } = rows[0];
+      const classes = rows.map(r => ({
+        registrationId: r.registrationId,
+        title: r.title, date: r.date, time: r.time, instructor: r.instructor
+      }));
+      // Fire confirmation email (don't await so the response isn't blocked
+      // by Resend's latency)
+      sendBatchDropInConfirmation({ to: email, firstName, lastName, classes })
+        .catch(e => console.error('Batch confirmation email error:', e.message));
+      // Also notify admin once, with the first class (keeps existing
+      // admin-notification template unchanged for now)
+      getSetting('booking_notify_email').then(notifyEmail => {
+        if (notifyEmail) {
+          const first = classes[0];
+          sendNewBookingNotification({
+            notifyEmail,
+            registrant: { firstName, lastName, email, phone },
+            cls: { title: `${first.title} (+${classes.length - 1} more class${classes.length === 2 ? '' : 'es'})`,
+                   date: first.date, time: first.time, instructor: first.instructor }
+          }).catch(e => console.error('Notify email error:', e.message));
+        }
+      });
+      res.json({ success: true, classesEmailed: classes.length });
+    } catch (e) { console.error('batch-confirmation error:', e); res.status(500).json({ error: 'Server error' }); }
   });
 
   app.get('/api/registrations', requireAdmin, async (req, res) => {
@@ -1558,7 +1681,7 @@ async function createApp() {
         id: r.id, classId: r.classId, firstName: r.firstName,
         lastName: r.lastName, email: r.email, phone: r.phone,
         registeredAt: r.registeredAt, paymentStatus: r.payment_status,
-        packageType: r.package_type || 'single', userId: r.user_id,
+        packageType: r.package_type || 'single', userId: r.user_id, batchId: r.batch_id,
         class: r.title ? { title: r.title, date: r.date, time: r.time, instructor: r.instructor } : null
       }));
       res.json(enriched);
@@ -2056,37 +2179,49 @@ async function createApp() {
   // Admin: mark a registration as paid
   app.post('/api/admin/registrations/:id/mark-paid', requireAdmin, async (req, res) => {
     try {
-      // Atomic, idempotent transition: only flip to 'paid' if currently not 'paid'.
-      // RETURNING the row tells us whether a state change actually happened — if no row
-      // is returned it means the registration was already paid (or doesn't exist) and
-      // we must NOT re-grant credits or re-send confirmation emails.
+      // Step 1 — look up the registration to check if it's part of a batch.
+      // If it is, flipping this one also flips all sibling drop-ins in the
+      // same batch (one payment, many classes). Idempotent: rows already
+      // paid stay paid; the batch-transition is a no-op for them.
+      const { rows: peek } = await pool.query(
+        `SELECT id, payment_status, batch_id, package_type, email FROM registrations WHERE id = $1`,
+        [req.params.id]
+      );
+      if (!peek.length) return res.status(404).json({ error: 'Registration not found' });
+      if (peek[0].payment_status === 'paid') {
+        return res.status(200).json({ success: true, alreadyPaid: true });
+      }
+
+      // Step 2 — flip this row + any pending siblings (only for single/batched bookings)
+      const batchId = peek[0].batch_id;
+      const isBatched = !!batchId && peek[0].package_type === 'single';
+
+      const whereClause = isBatched
+        ? `batch_id = $1 AND payment_status != 'paid'`
+        : `id = $1 AND payment_status != 'paid'`;
       const { rows: updated } = await pool.query(
         `UPDATE registrations SET payment_status = 'paid'
-         WHERE id = $1 AND payment_status != 'paid'
+         WHERE ${whereClause}
          RETURNING id, "firstName", "lastName", email, "classId", package_type, user_id`,
-        [req.params.id]
+        [isBatched ? batchId : req.params.id]
       );
 
       if (!updated.length) {
-        // Either already paid or not found — distinguish so the UI can refresh cleanly
-        const { rows: existing } = await pool.query(
-          `SELECT payment_status FROM registrations WHERE id = $1`,
-          [req.params.id]
-        );
-        if (!existing.length) return res.status(404).json({ error: 'Registration not found' });
         return res.status(200).json({ success: true, alreadyPaid: true });
       }
 
       const reg = updated[0];
 
-      // Fetch class details for the email
+      // Fetch class details. For a batch we pick the first class for the email
+      // title but the email itself can list all classes.
       const { rows: clsRows } = await pool.query(
         `SELECT title, date, time, instructor, duration FROM classes WHERE id = $1`,
         [reg.classId]
       );
       const cls = clsRows[0] || { title: '(class removed)', date: '', time: '', instructor: '', duration: 0 };
 
-      // 4-pack: add 3 credits (1 used for this class, 3 carry forward)
+      // 4-pack: add 3 credits (1 used for this class, 3 carry forward).
+      // Never happens on the batched path because we guard package_type='single'.
       if (reg.package_type === '4pack') {
         const userId = reg.user_id;
         let creditsRemaining = 3;
@@ -2098,13 +2233,31 @@ async function createApp() {
           const { rows: cr } = await pool.query('SELECT balance FROM user_credits WHERE user_id = $1', [userId]);
           creditsRemaining = cr.length ? cr[0].balance : 3;
         }
-        res.json({ success: true, packageType: '4pack', creditsAdded: 3, creditsRemaining });
+        res.json({ success: true, packageType: '4pack', creditsAdded: 3, creditsRemaining, classesPaid: 1 });
         sendPackageConfirmedEmail({ to: reg.email, firstName: reg.firstName, cls, creditsRemaining })
           .catch(e => console.error('Package confirmed email error:', e.message));
       } else {
-        res.json({ success: true, packageType: reg.package_type || 'single' });
-        sendPaymentConfirmedEmail({ to: reg.email, firstName: reg.firstName, cls })
-          .catch(e => console.error('Payment confirmed email error:', e.message));
+        res.json({
+          success: true,
+          packageType: reg.package_type || 'single',
+          classesPaid: updated.length,
+          batchId: isBatched ? batchId : null
+        });
+        // Fetch class details for all paid rows so the confirmation email can
+        // list every class the payment covered (when it was a batch)
+        if (isBatched && updated.length > 1) {
+          const { rows: allClasses } = await pool.query(`
+            SELECT c.title, c.date, c.time, c.instructor, c.duration
+            FROM registrations r JOIN classes c ON c.id = r."classId"
+            WHERE r.batch_id = $1
+            ORDER BY c.date ASC, c.time ASC
+          `, [batchId]);
+          sendPaymentConfirmedEmail({ to: reg.email, firstName: reg.firstName, cls, classes: allClasses })
+            .catch(e => console.error('Payment confirmed email error:', e.message));
+        } else {
+          sendPaymentConfirmedEmail({ to: reg.email, firstName: reg.firstName, cls })
+            .catch(e => console.error('Payment confirmed email error:', e.message));
+        }
       }
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
