@@ -1,6 +1,7 @@
 const express    = require('express');
 const { Pool }   = require('pg');
 const path       = require('path');
+const fs         = require('fs');
 const session    = require('express-session');
 const pgSession  = require('connect-pg-simple')(session);
 const passport   = require('passport');
@@ -11,6 +12,32 @@ const bcrypt     = require('bcryptjs');
 const multer     = require('multer');
 const { Resend } = require('resend');
 const crypto     = require('crypto');
+const helmet     = require('helmet');
+const rateLimit  = require('express-rate-limit');
+const escapeHtml = require('escape-html');
+
+// --- Environment gate ---
+// Every secret/config the app depends on MUST come from the environment.
+// Fail fast at startup if anything required is missing — the alternative
+// (silent fallback to a dev default) is how production sites leak.
+const IS_PROD = process.env.NODE_ENV === 'production';
+const REQUIRED_ENV = ['DATABASE_URL', 'SESSION_SECRET', 'CRON_SECRET', 'APP_URL'];
+const envMissing = REQUIRED_ENV.filter(n => !process.env[n] || String(process.env[n]).length < 8);
+if (envMissing.length) {
+  console.error('[startup] Missing/too-short required env vars: ' + envMissing.join(', '));
+  console.error('[startup] Generate strong secrets via:  node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"');
+  process.exit(1);
+}
+if (process.env.SESSION_SECRET.length < 32) {
+  console.error('[startup] SESSION_SECRET must be at least 32 chars long.');
+  process.exit(1);
+}
+// Reject any of the former hardcoded dev defaults if someone pasted them as real secrets.
+const BANNED_SECRETS = new Set(['dev-secret', 'redmaple-dev-secret-change-in-production', 'pilates2024']);
+if (BANNED_SECRETS.has(process.env.SESSION_SECRET) || BANNED_SECRETS.has(process.env.CRON_SECRET)) {
+  console.error('[startup] A placeholder value is being used for SESSION_SECRET or CRON_SECRET — rotate it.');
+  process.exit(1);
+}
 
 // Multer: parse multipart/form-data for Page Editor image uploads.
 // Keep files in memory (small studio, few images) so we can stream them
@@ -26,8 +53,9 @@ const imageUpload = multer({
 });
 
 const PORT = process.env.PORT || 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'pilates2024';
-const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
+// APP_URL is required above; no localhost fallback — the full URL is used to
+// build cancel/reset/waiver links and those must not point at localhost in prod.
+const APP_URL = process.env.APP_URL;
 
 // --- Email ---
 function getResend() {
@@ -35,12 +63,12 @@ function getResend() {
 }
 
 function cancelToken(registrationId) {
-  return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'dev-secret')
-    .update(registrationId).digest('hex');
+  return crypto.createHmac('sha256', process.env.SESSION_SECRET)
+    .update(String(registrationId)).digest('hex');
 }
 
 function paymentActionToken(registrationId, action) {
-  return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'dev-secret')
+  return crypto.createHmac('sha256', process.env.SESSION_SECRET)
     .update(`payment-${action}-${registrationId}`).digest('hex');
 }
 
@@ -141,8 +169,19 @@ async function sendConfirmationEmail({ to, firstName, lastName, cls, registratio
 }
 
 function waiverViewToken(waiverId) {
-  return crypto.createHmac('sha256', process.env.SESSION_SECRET || 'dev-secret')
+  return crypto.createHmac('sha256', process.env.SESSION_SECRET)
     .update(`waiver-${waiverId}`).digest('hex');
+}
+
+// --- Signature data-URL sanitiser ---
+// Signatures arrive as base64 data URLs from an HTML5 canvas. Before we render
+// them back into an <img src=...>, confirm they match the canvas-export format
+// so an attacker can't store `javascript:...` or an inline SVG with a <script>.
+const SAFE_SIGNATURE_RE = /^data:image\/(png|jpe?g);base64,[A-Za-z0-9+/=\s]+$/;
+function safeSignatureSrc(v) {
+  if (typeof v !== 'string') return '';
+  const trimmed = v.trim();
+  return SAFE_SIGNATURE_RE.test(trimmed) && trimmed.length < 2_000_000 ? trimmed : '';
 }
 
 // Combined confirmation email for a multi-class drop-in batch. Sent once per
@@ -719,11 +758,7 @@ async function sendPackageConfirmedEmail({ to, firstName, cls, creditsRemaining 
   });
 }
 
-if (!process.env.DATABASE_URL) {
-  console.error('ERROR: DATABASE_URL environment variable is not set.');
-  process.exit(1);
-}
-
+// DATABASE_URL is guaranteed present by the env gate above.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -1013,6 +1048,39 @@ async function createApp() {
   const app = express();
   app.set('trust proxy', 1);
 
+  // 1a. Security headers (must come before other middleware so every response gets them)
+  // - CSP allows the CDN/analytics origins the frontend actually uses: jsDelivr for Chart.js
+  //   on admin pages, Google Fonts for typography, Clarity for admin-opted-in session analytics.
+  // - 'unsafe-inline' styles are kept because the admin dashboard uses inline style attributes
+  //   extensively; inline scripts are NOT allowed. If admin.html triggers CSP errors we'll
+  //   migrate inline handlers to addEventListener rather than loosening the policy.
+  // - HSTS only in production — local dev runs over HTTP.
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", 'https://cdn.jsdelivr.net', 'https://www.clarity.ms', 'https://*.clarity.ms', 'https://*.vercel-insights.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        mediaSrc: ["'self'"],
+        connectSrc: ["'self'", 'https://*.clarity.ms', 'https://*.vercel-insights.com'],
+        frameAncestors: ["'none'"],
+        formAction: ["'self'"],
+        baseUri: ["'self'"],
+        objectSrc: ["'none'"]
+      }
+    },
+    crossOriginEmbedderPolicy: false,    // we host external fonts + images
+    crossOriginResourcePolicy: { policy: 'same-site' },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    hsts: IS_PROD ? { maxAge: 31536000, includeSubDomains: true, preload: false } : false
+  }));
+
+  // Behind Vercel's proxy; required so express-rate-limit sees the real client IP
+  // and req.secure reflects the original TLS termination.
+  app.set('trust proxy', 1);
+
   // 2. Session middleware — DB tables are guaranteed to exist now
   app.use(session({
     store: new pgSession({
@@ -1020,12 +1088,17 @@ async function createApp() {
       tableName: 'user_sessions',
       createTableIfMissing: false  // table was just created above
     }),
-    secret: process.env.SESSION_SECRET || 'redmaple-dev-secret-change-in-production',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === 'production',
+      secure: IS_PROD,
       httpOnly: true,
+      // 'lax' blocks cross-site POST/PUT/DELETE (CSRF) but still lets
+      // top-level GET navigation carry the session — which is what the OAuth
+      // callback flow relies on. All state-changing requests go through fetch
+      // with Content-Type: application/json, which browsers can't forge cross-site.
+      sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000
     }
   }));
@@ -1033,7 +1106,144 @@ async function createApp() {
   app.use(passport.initialize());
   app.use(passport.session());
   app.use(express.json());
+
+  // --- Server-side SEO injection for /schedule.html ---
+  // The schedule page normally loads classes client-side via /api/classes, which
+  // means search-engine crawlers and LLM bots that don't execute JS see an empty
+  // calendar. We intercept /schedule.html BEFORE express.static, query upcoming
+  // classes, and inject a crawlable <section> + Event JSON-LD so that Google,
+  // Perplexity, ChatGPT, etc. can quote concrete class info ("what classes are
+  // on this week in Campbellville?"). The visual JS calendar is untouched.
+  let _scheduleHtmlCache = null;
+  function getScheduleTemplate() {
+    if (!_scheduleHtmlCache) {
+      _scheduleHtmlCache = fs.readFileSync(path.join(__dirname, 'public', 'schedule.html'), 'utf8');
+    }
+    return _scheduleHtmlCache;
+  }
+
+  app.get('/schedule.html', async (req, res, next) => {
+    try {
+      const template = getScheduleTemplate();
+
+      // Next ~12 upcoming classes, joined with registration counts for availability.
+      // Uses the same query shape as /api/classes but filters to future dates only.
+      const { rows: classes } = await pool.query(`
+        SELECT c.*, COUNT(r.id)::int AS "registeredCount"
+        FROM classes c
+        LEFT JOIN registrations r ON r."classId" = c.id
+        WHERE (c.date || ' ' || c.time)::timestamp >= NOW() - INTERVAL '1 hour'
+        GROUP BY c.id
+        ORDER BY c.date, c.time
+        LIMIT 12
+      `);
+
+      const htmlItems = classes.map(c => {
+        const spotsLeft = Math.max(0, (c.capacity || 0) - (c.registeredCount || 0));
+        const availability = spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft === 1 ? '' : 's'} available` : 'Fully booked';
+        return `
+    <li class="seo-class-item">
+      <strong>${escapeHtml(c.title || 'Mat Pilates')}</strong> with ${escapeHtml(c.instructor || 'Studio Instructor')} — ${escapeHtml(c.date)} at ${escapeHtml(c.time)} (${c.duration || 60} min). ${availability}.${c.description ? ` ${escapeHtml(c.description)}` : ''}
+    </li>`;
+      }).join('');
+
+      const jsonLdEvents = classes.map(c => {
+        // Combine date + time into a best-effort ISO 8601 local timestamp.
+        // Classes are stored in studio-local time (America/Toronto); we emit
+        // a naive ISO string which Google accepts for recurring local events.
+        const startDate = `${c.date}T${c.time}:00`;
+        const endMinutes = (c.duration || 60);
+        // Compute end time by adding minutes — quick arithmetic, good enough for schema.
+        const [hh, mm] = (c.time || '00:00').split(':').map(Number);
+        const endDt = new Date(2000, 0, 1, hh, mm + endMinutes);
+        const endTime = `${String(endDt.getHours()).padStart(2,'0')}:${String(endDt.getMinutes()).padStart(2,'0')}`;
+        const endDate = `${c.date}T${endTime}:00`;
+        const spotsLeft = Math.max(0, (c.capacity || 0) - (c.registeredCount || 0));
+        return {
+          "@context": "https://schema.org",
+          "@type": "Event",
+          "name": c.title || "Mat Pilates Class",
+          "description": c.description || "Small-group mat Pilates class at Red Maple Movement.",
+          "startDate": startDate,
+          "endDate": endDate,
+          "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+          "eventStatus": spotsLeft > 0 ? "https://schema.org/EventScheduled" : "https://schema.org/EventScheduled",
+          "location": {
+            "@type": "Place",
+            "name": "Red Maple Movement",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "43 Main Street South, Suite 2B",
+              "addressLocality": "Campbellville",
+              "addressRegion": "ON",
+              "postalCode": "L0P 1B0",
+              "addressCountry": "CA"
+            }
+          },
+          "organizer": {
+            "@type": "Organization",
+            "name": "Red Maple Movement",
+            "url": "https://redmaplemovement.ca"
+          },
+          "performer": {
+            "@type": "Person",
+            "name": c.instructor || "Studio Instructor"
+          },
+          "offers": {
+            "@type": "Offer",
+            "url": "https://redmaplemovement.ca/schedule.html",
+            "price": "25.00",
+            "priceCurrency": "CAD",
+            "availability": spotsLeft > 0 ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
+            "validFrom": new Date().toISOString()
+          }
+        };
+      });
+
+      const injection = classes.length === 0 ? '' : `
+<!-- SEO: server-rendered upcoming classes (hidden visually; the JS calendar is the UI) -->
+<section class="seo-upcoming-classes" aria-label="Upcoming Pilates classes at Red Maple Movement" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;">
+  <h2>Upcoming Pilates Classes in Campbellville, ON</h2>
+  <p>Red Maple Movement hosts small-group mat Pilates classes at 43 Main Street South, Suite 2B, Campbellville, Ontario. Upcoming schedule:</p>
+  <ul>${htmlItems}
+  </ul>
+</section>
+<script type="application/ld+json">
+${JSON.stringify(jsonLdEvents, null, 2)}
+</script>
+`;
+
+      const rendered = template.replace('</body>', `${injection}</body>`);
+      res.set('Content-Type', 'text/html; charset=utf-8');
+      res.set('Cache-Control', 'public, max-age=300'); // 5 min edge cache
+      return res.send(rendered);
+    } catch (err) {
+      // Any failure: fall through to static handler, which will serve the raw file.
+      console.error('schedule.html SEO injection failed:', err);
+      return next();
+    }
+  });
+
   app.use(express.static(path.join(__dirname, 'public')));
+
+  // --- Rate limiters ---
+  // Narrow limiters applied only to credential-handling endpoints. Keeps legitimate
+  // users unaffected while throttling brute-force / credential-stuffing / spam-reset.
+  // `trust proxy` above ensures the IP is the real client, not the Vercel edge.
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,   // 15 min
+    limit: 10,                  // 10 attempts / IP / window
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: 'Too many attempts — please wait a few minutes and try again.' }
+  });
+  const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,   // 1 hr
+    limit: 60,                  // matches expected booking flow; generous
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: 'Too many registrations from this network — please wait and retry.' }
+  });
 
   // Ensure session is fully written to DB before any redirect (fixes Vercel serverless OAuth state loss)
   app.use((req, res, next) => {
@@ -1309,7 +1519,7 @@ async function createApp() {
     res.json({ user: { id, email, firstName: first_name, lastName: last_name, isAdmin: !!is_admin, phone } });
   });
 
-  app.post('/auth/signup', async (req, res) => {
+  app.post('/auth/signup', authLimiter, async (req, res) => {
     const { email, password, firstName, lastName } = req.body;
     if (!email || !password || !firstName || !lastName)
       return res.status(400).json({ error: 'All fields are required.' });
@@ -1333,7 +1543,7 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
-  app.post('/auth/login', (req, res, next) => {
+  app.post('/auth/login', authLimiter, (req, res, next) => {
     passport.authenticate('local', (err, user, info) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ error: info?.message || 'Sign in failed.' });
@@ -1346,7 +1556,7 @@ async function createApp() {
 
   // Forgot password — send a one-time reset link by email.
   // Always returns success (doesn't leak which emails exist).
-  app.post('/auth/forgot-password', async (req, res) => {
+  app.post('/auth/forgot-password', authLimiter, async (req, res) => {
     const { email } = req.body || {};
     if (!email) return res.status(400).json({ error: 'Email is required.' });
     const trimmedEmail = email.trim();
@@ -1392,7 +1602,7 @@ async function createApp() {
   });
 
   // Reset password — consumes the one-time token and sets a new password
-  app.post('/auth/reset-password', async (req, res) => {
+  app.post('/auth/reset-password', authLimiter, async (req, res) => {
     const { token, password } = req.body || {};
     if (!token || !password)  return res.status(400).json({ error: 'Token and password are required.' });
     if (password.length < 8)  return res.status(400).json({ error: 'Password must be at least 8 characters.' });
@@ -1591,7 +1801,7 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
-  app.post('/api/register', async (req, res) => {
+  app.post('/api/register', registerLimiter, async (req, res) => {
     const { classId, firstName, lastName, email, phone, packageType, password, batchId } = req.body;
     if (!classId || !firstName || !lastName || !email)
       return res.status(400).json({ error: 'Missing required fields' });
@@ -2681,6 +2891,43 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
+  // --- Waiver HTML renderer (shared) ---
+  // All waiver fields come from user input (signup + waiver form). We
+  // HTML-escape every interpolated value, validate the signature data URL
+  // against an allowlist (see safeSignatureSrc), and keep the Print button
+  // handler out-of-line to satisfy CSP (no 'unsafe-inline' scriptSrc).
+  function renderWaiverHtml(w, { titleSuffix } = {}) {
+    const signedDate = new Date(w.signed_at).toLocaleDateString('en-CA', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    const fullName = `${escapeHtml(w.first_name || '')} ${escapeHtml(w.last_name || '')}`.trim();
+    const safeSig = safeSignatureSrc(w.signature_data);
+    const title = titleSuffix ? `Waiver — ${fullName || 'Red Maple Movement'}` : 'Signed Waiver — Red Maple Movement';
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>${escapeHtml(title)}</title>
+        <style>
+          body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;padding:0 1.5rem;color:#333}
+          h1{color:#8B1A1A} .field{margin:8px 0;padding:10px 14px;background:#f9f9f9;border-radius:6px;border-left:3px solid #8B1A1A}
+          .label{font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:.05em} .value{font-weight:600;margin-top:2px;white-space:pre-wrap}
+          .sig img{max-width:100%;border:1px solid #ddd;border-radius:4px;margin-top:8px}
+          .badge{display:inline-block;background:#2e7d32;color:#fff;padding:4px 12px;border-radius:20px;font-size:0.85rem;margin-bottom:1.5rem}
+          #printBtn{background:#8B1A1A;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:1rem}
+          @media print{#printBtn{display:none}}
+        </style>
+      </head><body>
+        <h1>Red Maple Movement — Signed Waiver</h1>
+        <div class="badge">✓ Signed on ${escapeHtml(signedDate)}</div>
+        <div class="field"><div class="label">Full Name</div><div class="value">${fullName || '—'}</div></div>
+        <div class="field"><div class="label">Email</div><div class="value">${escapeHtml(w.email || '—')}</div></div>
+        <div class="field"><div class="label">Phone</div><div class="value">${escapeHtml(w.phone || '—')}</div></div>
+        <div class="field"><div class="label">Emergency Contact</div><div class="value">${escapeHtml(w.emergency_name || '—')}${w.emergency_phone ? ' · ' + escapeHtml(w.emergency_phone) : ''}</div></div>
+        <div class="field"><div class="label">Pilates Experience</div><div class="value">${escapeHtml(pilatesExperienceLabel(w.pilates_experience) || '—')}</div></div>
+        <div class="field"><div class="label">Health Conditions</div><div class="value">${escapeHtml(w.health_conditions || 'None stated')}</div></div>
+        ${safeSig ? `<div class="field sig"><div class="label">Signature</div><img src="${safeSig}" alt="Signature"></div>` : ''}
+        <p style="margin-top:2rem"><button id="printBtn" type="button">Print / Save PDF</button></p>
+        <script src="/js/waiver-view.js"></script>
+      </body></html>`;
+  }
+
   // Secure waiver view page (linked from confirmation email)
   app.get('/api/waiver/view/:id', async (req, res) => {
     const { token } = req.query;
@@ -2689,31 +2936,7 @@ async function createApp() {
     try {
       const { rows } = await pool.query('SELECT * FROM waivers WHERE id = $1', [req.params.id]);
       if (!rows.length) return res.status(404).send('<h2>Waiver not found.</h2>');
-      const w = rows[0];
-      const signedDate = new Date(w.signed_at).toLocaleDateString('en-CA', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-      res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Signed Waiver — Red Maple Movement</title>
-        <style>
-          body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;padding:0 1.5rem;color:#333}
-          h1{color:#8B1A1A} .field{margin:8px 0;padding:10px 14px;background:#f9f9f9;border-radius:6px;border-left:3px solid #8B1A1A}
-          .label{font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:.05em} .value{font-weight:600;margin-top:2px}
-          .sig img{max-width:100%;border:1px solid #ddd;border-radius:4px;margin-top:8px}
-          .badge{display:inline-block;background:#2e7d32;color:#fff;padding:4px 12px;border-radius:20px;font-size:0.85rem;margin-bottom:1.5rem}
-          @media print{button{display:none}}
-        </style>
-      </head><body>
-        <h1>Red Maple Movement — Signed Waiver</h1>
-        <div class="badge">✓ Signed on ${signedDate}</div>
-        <div class="field"><div class="label">Full Name</div><div class="value">${w.first_name} ${w.last_name}</div></div>
-        <div class="field"><div class="label">Email</div><div class="value">${w.email}</div></div>
-        <div class="field"><div class="label">Phone</div><div class="value">${w.phone || '—'}</div></div>
-        <div class="field"><div class="label">Emergency Contact</div><div class="value">${w.emergency_name || '—'}${w.emergency_phone ? ' · ' + w.emergency_phone : ''}</div></div>
-        <div class="field"><div class="label">Pilates Experience</div><div class="value">${pilatesExperienceLabel(w.pilates_experience)}</div></div>
-        <div class="field"><div class="label">Health Conditions</div><div class="value">${w.health_conditions || 'None stated'}</div></div>
-        ${w.signature_data ? `<div class="field sig"><div class="label">Signature</div><img src="${w.signature_data}" alt="Signature"></div>` : ''}
-        <p style="margin-top:2rem"><button onclick="window.print()" style="background:#8B1A1A;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:1rem">Print / Save PDF</button></p>
-      </body></html>`);
+      res.send(renderWaiverHtml(rows[0]));
     } catch (e) { console.error(e); res.status(500).send('<h2>Something went wrong.</h2>'); }
   });
 
@@ -2722,31 +2945,7 @@ async function createApp() {
     try {
       const { rows } = await pool.query('SELECT * FROM waivers WHERE id = $1', [req.params.id]);
       if (!rows.length) return res.status(404).send('<h2>Waiver not found.</h2>');
-      const w = rows[0];
-      const signedDate = new Date(w.signed_at).toLocaleDateString('en-CA', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-      res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Waiver — ${w.first_name} ${w.last_name}</title>
-        <style>
-          body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;padding:0 1.5rem;color:#333}
-          h1{color:#8B1A1A} .field{margin:8px 0;padding:10px 14px;background:#f9f9f9;border-radius:6px;border-left:3px solid #8B1A1A}
-          .label{font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:.05em} .value{font-weight:600;margin-top:2px}
-          .sig img{max-width:100%;border:1px solid #ddd;border-radius:4px;margin-top:8px}
-          .badge{display:inline-block;background:#2e7d32;color:#fff;padding:4px 12px;border-radius:20px;font-size:0.85rem;margin-bottom:1.5rem}
-          @media print{button{display:none}}
-        </style>
-      </head><body>
-        <h1>Red Maple Movement — Signed Waiver</h1>
-        <div class="badge">✓ Signed on ${signedDate}</div>
-        <div class="field"><div class="label">Full Name</div><div class="value">${w.first_name} ${w.last_name}</div></div>
-        <div class="field"><div class="label">Email</div><div class="value">${w.email}</div></div>
-        <div class="field"><div class="label">Phone</div><div class="value">${w.phone || '—'}</div></div>
-        <div class="field"><div class="label">Emergency Contact</div><div class="value">${w.emergency_name || '—'}${w.emergency_phone ? ' · ' + w.emergency_phone : ''}</div></div>
-        <div class="field"><div class="label">Pilates Experience</div><div class="value">${pilatesExperienceLabel(w.pilates_experience)}</div></div>
-        <div class="field"><div class="label">Health Conditions</div><div class="value">${w.health_conditions || 'None stated'}</div></div>
-        ${w.signature_data ? `<div class="field sig"><div class="label">Signature</div><img src="${w.signature_data}" alt="Signature"></div>` : ''}
-        <p style="margin-top:2rem"><button onclick="window.print()" style="background:#8B1A1A;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:1rem">Print / Save PDF</button></p>
-      </body></html>`);
+      res.send(renderWaiverHtml(rows[0], { titleSuffix: true }));
     } catch (e) { console.error(e); res.status(500).send('<h2>Something went wrong.</h2>'); }
   });
 

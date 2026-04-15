@@ -8,9 +8,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
   <meta property="og:title" content="Sign In — Red Maple Movement">
   <meta property="og:description" content="Sign in to manage your bookings.">
-  <meta property="og:image" content="https://pilates-studio-inky.vercel.app/images/logo.png">
+  <meta property="og:image" content="https://redmaplemovement.ca/images/logo.png">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:image" content="https://pilates-studio-inky.vercel.app/images/logo.png">
+  <meta name="twitter:image" content="https://redmaplemovement.ca/images/logo.png">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="stylesheet" href="css/styles.css?v=4">
 </head>
 <body>
@@ -168,7 +172,9 @@ let mode = 'signin';
 
 const params = new URLSearchParams(window.location.search);
 const oauthErr = params.get('error');
-const returnToPage = params.get('returnTo') || 'my-schedule.html';
+// window.safeReturnTo (from auth.js) strips any absolute/protocol-relative
+// URL so an attacker can't turn the login redirect into an open redirect.
+const returnToPage = window.safeReturnTo(params.get('returnTo'), '/my-schedule.html');
 
 // Show cart summary if arriving from schedule checkout
 const cartData = JSON.parse(sessionStorage.getItem('scheduleCart') || 'null');

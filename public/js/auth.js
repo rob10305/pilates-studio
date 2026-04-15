@@ -1,3 +1,19 @@
+// Shared helper — mirrors server.js `safeReturnTo`. Rejects absolute URLs,
+// protocol-relative URLs, and Windows paths so `?returnTo=https://evil.com`
+// can't be used as an open redirect after login/signup/waiver flows.
+// Always returns a same-origin path.
+window.safeReturnTo = function (raw, fallback) {
+  var DEFAULT = fallback || '/my-schedule.html';
+  if (typeof raw !== 'string' || !raw) return DEFAULT;
+  var v = raw.trim();
+  if (!v) return DEFAULT;
+  // Block anything that could escape the current origin.
+  if (/^[a-z][a-z0-9+.\-]*:/i.test(v)) return DEFAULT;   // http:, https:, javascript:, data:, etc.
+  if (v.startsWith('//') || v.startsWith('\\')) return DEFAULT;
+  // Normalise to a leading slash without losing legitimate query strings.
+  return v.startsWith('/') ? v : '/' + v;
+};
+
 // Shared auth state — included on every page.
 // Fills <li id="authNav"> with Sign In link or user greeting + Sign Out.
 (async function () {

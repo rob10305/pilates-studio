@@ -3,14 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Participant Waiver — Red Maple Movement</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
+  <title>Participant Waiver — Red Maple Movement Pilates</title>
+  <meta name="description" content="Sign the liability waiver before your first Pilates class at Red Maple Movement, Campbellville, ON.">
+  <link rel="canonical" href="https://redmaplemovement.ca/waiver.html">
+  <link rel="alternate" hreflang="en-ca" href="https://redmaplemovement.ca/waiver.html">
+  <meta name="theme-color" content="#B71C22">
   <meta property="og:title" content="Participant Waiver — Red Maple Movement">
   <meta property="og:description" content="Sign the liability waiver before your first class.">
-  <meta property="og:image" content="https://pilates-studio-inky.vercel.app/images/logo.png">
+  <meta property="og:image" content="https://redmaplemovement.ca/images/logo.png">
+  <meta property="og:url" content="https://redmaplemovement.ca/waiver.html">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="en_CA">
+  <meta property="og:site_name" content="Red Maple Movement">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:image" content="https://pilates-studio-inky.vercel.app/images/logo.png">
+  <meta name="twitter:title" content="Participant Waiver — Red Maple Movement">
+  <meta name="twitter:description" content="Sign the liability waiver before your first class.">
+  <meta name="twitter:image" content="https://redmaplemovement.ca/images/logo.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css?v=4">
   <style>
     .waiver-layout { max-width: 780px; margin: 0 auto; padding: 40px 5% 80px; }
@@ -476,7 +492,10 @@ async function submitWaiver() {
 
 function showSuccess(waiverData) {
   const layout = document.querySelector('.waiver-layout');
-  const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+  // Sanitise via the shared helper so a crafted ?returnTo=https://evil.com
+  // can't turn the waiver redirect into an open redirect after signing.
+  const rawReturnTo = new URLSearchParams(window.location.search).get('returnTo');
+  const returnTo = rawReturnTo ? window.safeReturnTo(rawReturnTo, null) : null;
 
   if (returnTo) {
     // Came from booking flow — redirect back to complete the registration
