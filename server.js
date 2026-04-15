@@ -1424,6 +1424,25 @@ async function createApp() {
     if (req.query.returnTo) req.session.authReturnTo = req.query.returnTo;
     passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
   });
+  // Normalize an arbitrary returnTo value into a safe same-origin path.
+  // Rejects protocol-relative (//evil.com) and external (https://evil.com)
+  // destinations — those are open-redirect foot-guns — and collapses any
+  // mix of leading slashes to exactly one. Falls back to '/' on anything
+  // suspicious, which is why Chrome was barfing with ERR_INVALID_REDIRECT
+  // before: the old `'/' + returnTo` trick produced '//register.html'
+  // when returnTo already started with a slash.
+  function safeReturnTo(raw) {
+    if (!raw || typeof raw !== 'string') return '/';
+    let s = String(raw).trim();
+    // Block absolute URLs and protocol-relative URLs outright
+    if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return '/';   // http:, https:, javascript:, etc.
+    if (s.startsWith('//'))              return '/';   // protocol-relative
+    if (s.startsWith('\\'))              return '/';   // windows-style
+    // Strip ALL leading slashes, then prepend exactly one
+    s = '/' + s.replace(/^\/+/, '');
+    return s;
+  }
+
   app.get('/auth/google/callback', (req, res, next) => {
     if (!process.env.GOOGLE_CLIENT_ID) return res.redirect('/login.html?error=google-not-configured');
     passport.authenticate('google', (err, user) => {
@@ -1431,7 +1450,7 @@ async function createApp() {
       if (!user) { console.error('Google auth: no user returned'); return res.redirect('/login.html?error=google'); }
       req.login(user, (loginErr) => {
         if (loginErr) { console.error('Google login error:', loginErr.message || loginErr); return res.redirect('/login.html?error=google'); }
-        const returnTo = req.session.authReturnTo || '/';
+        const returnTo = safeReturnTo(req.session.authReturnTo);
         delete req.session.authReturnTo;
         // Explicitly save the session before redirecting. Without this,
         // express-session writes the row asynchronously and the browser can
@@ -1439,7 +1458,7 @@ async function createApp() {
         // exists in Postgres — producing a momentary "not signed in" flash.
         req.session.save(saveErr => {
           if (saveErr) console.error('Google session save error:', saveErr.message);
-          return res.redirect(returnTo.startsWith('http') ? returnTo : '/' + returnTo);
+          return res.redirect(returnTo);
         });
       });
     })(req, res, next);
@@ -1457,11 +1476,11 @@ async function createApp() {
       if (!user) { console.error('Facebook auth: no user returned'); return res.redirect('/login.html?error=facebook'); }
       req.login(user, (loginErr) => {
         if (loginErr) { console.error('Facebook login error:', loginErr.message || loginErr); return res.redirect('/login.html?error=facebook'); }
-        const returnTo = req.session.authReturnTo || '/';
+        const returnTo = safeReturnTo(req.session.authReturnTo);
         delete req.session.authReturnTo;
         req.session.save(saveErr => {
           if (saveErr) console.error('Facebook session save error:', saveErr.message);
-          return res.redirect(returnTo.startsWith('http') ? returnTo : '/' + returnTo);
+          return res.redirect(returnTo);
         });
       });
     })(req, res, next);
