@@ -1421,8 +1421,22 @@ async function createApp() {
 
   app.get('/auth/google', (req, res, next) => {
     if (!process.env.GOOGLE_CLIENT_ID) return res.redirect('/login.html?error=google-not-configured');
-    if (req.query.returnTo) req.session.authReturnTo = req.query.returnTo;
-    passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+    // Persist the returnTo into the session BEFORE initiating the OAuth
+    // redirect. Without an explicit save the browser can follow the 302 to
+    // accounts.google.com before express-session has written the row to
+    // Postgres, meaning the callback loads a session without authReturnTo
+    // and falls back to '/' — the cause of 'landed on home page instead of
+    // checkout' reports.
+    const start = () => passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+    if (req.query.returnTo) {
+      req.session.authReturnTo = req.query.returnTo;
+      req.session.save(err => {
+        if (err) console.error('Google auth session save error:', err.message);
+        start();
+      });
+    } else {
+      start();
+    }
   });
   // Normalize an arbitrary returnTo value into a safe same-origin path.
   // Rejects protocol-relative (//evil.com) and external (https://evil.com)
@@ -1466,8 +1480,16 @@ async function createApp() {
 
   app.get('/auth/facebook', (req, res, next) => {
     if (!process.env.FACEBOOK_APP_ID) return res.redirect('/login.html?error=facebook-not-configured');
-    if (req.query.returnTo) req.session.authReturnTo = req.query.returnTo;
-    passport.authenticate('facebook', { scope: ['email'] })(req, res, next);
+    const start = () => passport.authenticate('facebook', { scope: ['email'] })(req, res, next);
+    if (req.query.returnTo) {
+      req.session.authReturnTo = req.query.returnTo;
+      req.session.save(err => {
+        if (err) console.error('Facebook auth session save error:', err.message);
+        start();
+      });
+    } else {
+      start();
+    }
   });
   app.get('/auth/facebook/callback', (req, res, next) => {
     if (!process.env.FACEBOOK_APP_ID) return res.redirect('/login.html?error=facebook-not-configured');
