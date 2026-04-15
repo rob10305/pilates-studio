@@ -90,16 +90,31 @@ function emailWrap({ heading, subtitle, detailRows, body, buttonLabel, buttonUrl
     </div>`;
 }
 
-async function sendConfirmationEmail({ to, firstName, lastName, cls, registrationId }) {
+async function sendConfirmationEmail({ to, firstName, lastName, cls, registrationId, packageType }) {
   if (!process.env.RESEND_API_KEY) return;
   const cancelUrl = `${APP_URL}/api/registrations/${registrationId}/cancel?token=${cancelToken(registrationId)}`;
+
+  // Tailor the payment block to the package chosen at booking time
+  const isPack  = packageType === '4pack';
+  const price   = isPack ? '$85 CAD' : '$25 CAD';
+  const priceHeader = isPack ? 'SECURE YOUR 4-CLASS PACKAGE' : 'SECURE YOUR SPOT';
+  const priceSub    = isPack
+    ? 'For your 4-class bundle — 1 class used for this booking, 3 credits will be added to your account once payment is received.'
+    : 'Send via Interac e-Transfer to';
+  const priceBodyExtra = isPack
+    ? `<p style="font-size:12px;color:#6b6b6b;margin:8px 0 0">After payment confirmation, use your remaining credits when booking future classes (no payment needed until your balance runs out).</p>`
+    : '';
+  const subjectPrefix = isPack ? 'Booking Confirmed (4-Pack)' : 'Booking Confirmed';
+
   await getResend().emails.send({
     from: FROM_ADDRESS,
     to,
-    subject: `Booking Confirmed: ${cls.title} on ${formatClassDate(cls.date)}`,
+    subject: `${subjectPrefix}: ${cls.title} on ${formatClassDate(cls.date)}`,
     html: emailWrap({
-      heading: 'Booking Confirmed',
-      subtitle: `Your spot is reserved for the next hour. Please complete payment to confirm your spot in class.`,
+      heading: isPack ? 'Booking Confirmed — 4-Class Package' : 'Booking Confirmed',
+      subtitle: isPack
+        ? `Your spot is reserved. Please complete payment to confirm your booking and unlock your 4-class bundle.`
+        : `Your spot is reserved for the next hour. Please complete payment to confirm your spot in class.`,
       detailRows: [
         ['Name', `${firstName} ${lastName}`],
         ['Email', to],
@@ -107,13 +122,15 @@ async function sendConfirmationEmail({ to, firstName, lastName, cls, registratio
         ['Date', formatClassDate(cls.date)],
         ['Time', formatClassTime(cls.time)],
         ['Instructor', cls.instructor],
+        ...(isPack ? [['Package', '4-Class Bundle — $85 (save $15 vs. drop-in)']] : [])
       ],
       body: `
         <div style="background:#FAF7F2;border:1px solid #e8e3dd;border-radius:8px;padding:16px;margin-bottom:8px">
-          <p style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#6b6b6b;margin:0 0 4px;font-weight:700">SECURE YOUR SPOT</p>
-          <p style="font-family:Georgia,serif;font-size:22px;color:#820000;font-weight:700;margin:0 0 6px">$25 CAD</p>
-          <p style="font-size:13px;color:#6b6b6b;margin:0 0 2px">Send via Interac e-Transfer to</p>
-          <p style="font-size:15px;font-weight:700;color:#3a3a3a;margin:0">amanda@redmaplemovement.ca</p>
+          <p style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#6b6b6b;margin:0 0 4px;font-weight:700">${priceHeader}</p>
+          <p style="font-family:Georgia,serif;font-size:22px;color:#820000;font-weight:700;margin:0 0 6px">${price}</p>
+          <p style="font-size:13px;color:#6b6b6b;margin:0 0 2px">${priceSub}</p>
+          <p style="font-size:15px;font-weight:700;color:#3a3a3a;margin:${isPack ? '6px' : '0'} 0 0">amanda@redmaplemovement.ca</p>
+          ${priceBodyExtra}
         </div>
         <p style="font-size:12px;color:#b0b0b0;margin:8px 0 0">Your spot is held for 1 hour pending payment. <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
         <p style="font-size:13px;color:#6b6b6b;margin:12px 0 0">Need to cancel? <a href="${cancelUrl}" style="color:#820000">Cancel your booking</a></p>`,
@@ -1421,7 +1438,7 @@ async function createApp() {
         [registrationId, classId, firstName, lastName, email, phone || '', new Date().toISOString(), pkgType, userId]
       );
       res.status(201).json({ success: true, registrationId, packageType: pkgType, accountCreated });
-      sendConfirmationEmail({ to: email, firstName, lastName, cls, registrationId }).catch(e => console.error('Confirmation email error:', e.message));
+      sendConfirmationEmail({ to: email, firstName, lastName, cls, registrationId, packageType: pkgType }).catch(e => console.error('Confirmation email error:', e.message));
       getSetting('booking_notify_email').then(notifyEmail => {
         if (notifyEmail) sendNewBookingNotification({ notifyEmail, registrant: { firstName, lastName, email, phone }, cls }).catch(e => console.error('Notify email error:', e.message));
       });
@@ -2264,7 +2281,10 @@ async function createApp() {
     try {
       switch (emailType) {
         case 'booking_confirmed':
-          await sendConfirmationEmail({ to: testEmail, firstName: 'Test', lastName: 'User', cls: sampleCls, registrationId: sampleRegId });
+          await sendConfirmationEmail({ to: testEmail, firstName: 'Test', lastName: 'User', cls: sampleCls, registrationId: sampleRegId, packageType: 'single' });
+          break;
+        case 'booking_confirmed_4pack':
+          await sendConfirmationEmail({ to: testEmail, firstName: 'Test', lastName: 'User', cls: sampleCls, registrationId: sampleRegId, packageType: '4pack' });
           break;
         case 'payment_confirmed':
           await sendPaymentConfirmedEmail({ to: testEmail, firstName: 'Test', cls: sampleCls });
