@@ -120,11 +120,23 @@
         <input type="tel" id="phone" required>
       </div>
 
-      <div class="form-group">
+      <div class="form-group" id="classSelectGroup">
         <label for="classSelect">Select Class *</label>
         <select id="classSelect" required>
           <option value="">— Choose a class —</option>
         </select>
+      </div>
+
+      <!-- Cart classes (shown when arriving from schedule page with multiple classes) -->
+      <div id="cartClassesBanner" style="display:none;margin-bottom:1.25rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem">
+          <h4 style="margin:0;font-size:0.95rem;color:var(--charcoal)">Selected Classes</h4>
+          <a href="schedule.html" style="font-size:0.78rem;color:var(--red);text-decoration:none">← Edit selection</a>
+        </div>
+        <div style="background:var(--cream);border-radius:var(--radius);padding:0.25rem 1rem">
+          <div id="cartClassesList"></div>
+        </div>
+        <p style="margin:0.6rem 0 0;font-size:0.82rem;color:var(--mid)" id="cartTotalDisplay"></p>
       </div>
 
       <!-- Waiver required prompt (shown if waiver not yet signed) -->
@@ -156,10 +168,10 @@
       <!-- Single class -->
       <button onclick="doSubmit('single')" style="display:flex;align-items:center;gap:1rem;background:var(--cream);border:2px solid var(--border);border-radius:12px;padding:1rem 1.25rem;cursor:pointer;text-align:left;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
         <div style="flex:1">
-          <p style="font-weight:700;font-size:1rem;color:var(--charcoal);margin:0 0 0.2rem">Pay Per Class</p>
-          <p style="font-size:0.83rem;color:var(--mid);margin:0">Single class · no commitment</p>
+          <p id="singlePayTitle" style="font-weight:700;font-size:1rem;color:var(--charcoal);margin:0 0 0.2rem">Pay Per Class</p>
+          <p id="singlePayDesc" style="font-size:0.83rem;color:var(--mid);margin:0">Single class · no commitment</p>
         </div>
-        <p style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:var(--charcoal);margin:0;white-space:nowrap">$25 <span style="font-size:0.75rem;font-weight:400;color:var(--mid)">CAD</span></p>
+        <p id="singlePayPrice" style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:var(--charcoal);margin:0;white-space:nowrap">$25 <span style="font-size:0.75rem;font-weight:400;color:var(--mid)">CAD</span></p>
       </button>
       <!-- 4-class pack -->
       <button onclick="doSubmit('4pack')" style="display:flex;align-items:center;gap:1rem;background:#fff8f8;border:2px solid var(--red);border-radius:12px;padding:1rem 1.25rem;cursor:pointer;text-align:left;position:relative">
@@ -220,6 +232,8 @@
 
 <script>
 let allClasses = [];
+const cartIds = JSON.parse(sessionStorage.getItem('scheduleCart') || 'null');
+let cartClasses = [];
 const params = new URLSearchParams(window.location.search);
 const preselectedId = params.get('classId');
 
@@ -237,37 +251,38 @@ async function loadClasses() {
   const res = await fetch('/api/classes');
   allClasses = await res.json();
 
-  const select = document.getElementById('classSelect');
-  const now = new Date();
+  if (cartIds && cartIds.length > 0) {
+    // Cart mode — booking multiple classes selected on the schedule page
+    cartClasses = cartIds.map(id => allClasses.find(c => c.id === id)).filter(Boolean);
+    renderCartMode();
+  } else {
+    // Single class mode
+    const select = document.getElementById('classSelect');
+    const now = new Date();
 
-  // Sort by date/time
-  const upcoming = allClasses
-    .filter(c => {
-      const d = new Date(`${c.date}T${c.time}`);
-      return d >= now && ['2026-04-02','2026-04-09','2026-04-16','2026-04-23','2026-04-30'].includes(c.date);
-    })
-    .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+    const upcoming = allClasses
+      .filter(c => new Date(`${c.date}T${c.time}`) >= now)
+      .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
 
-  if (upcoming.length === 0) {
-    select.innerHTML = '<option value="">No upcoming classes available</option>';
-    return;
-  }
+    if (upcoming.length === 0) {
+      select.innerHTML = '<option value="">No upcoming classes available</option>';
+    } else {
+      upcoming.forEach(cls => {
+        const spotsLeft = cls.capacity - cls.registeredCount;
+        const isFull = spotsLeft <= 0;
+        const opt = document.createElement('option');
+        opt.value = cls.id;
+        opt.textContent = `${cls.title} — ${formatDate(cls.date)} at ${formatTime(cls.time)}${isFull ? ' (Full)' : ` (${spotsLeft} spots left)`}`;
+        opt.disabled = isFull;
+        if (isFull) opt.style.color = '#aaa';
+        select.appendChild(opt);
+      });
+    }
 
-  upcoming.forEach(cls => {
-    const spotsLeft = cls.capacity - cls.registeredCount;
-    const isFull = spotsLeft <= 0;
-    const dateStr = formatDate(cls.date);
-    const opt = document.createElement('option');
-    opt.value = cls.id;
-    opt.textContent = `${cls.title} — ${dateStr} at ${formatTime(cls.time)}${isFull ? ' (Full)' : ` (${spotsLeft} spots left)`}`;
-    opt.disabled = isFull;
-    if (isFull) opt.style.color = '#aaa';
-    select.appendChild(opt);
-  });
-
-  if (preselectedId) {
-    select.value = preselectedId;
-    updateBanner(preselectedId);
+    if (preselectedId) {
+      select.value = preselectedId;
+      updateBanner(preselectedId);
+    }
   }
 
   // Auto-submit pending booking after returning from waiver signing
@@ -277,9 +292,12 @@ async function loadClasses() {
     document.getElementById('lastName').value  = lastName;
     document.getElementById('email').value     = email;
     document.getElementById('phone').value     = phone || '';
-    if (classId) { select.value = classId; updateBanner(classId); }
+    if (classId && !cartIds) {
+      const select = document.getElementById('classSelect');
+      select.value = classId;
+      updateBanner(classId);
+    }
 
-    // Show a "waiver signed" confirmation banner above the form
     const alertBox = document.getElementById('alertBox');
     alertBox.className = 'waiver-done-banner';
     alertBox.innerHTML = '✅ &nbsp;Waiver signed — completing your booking now…';
@@ -287,6 +305,35 @@ async function loadClasses() {
 
     setTimeout(() => submitForm({ preventDefault: () => {} }), 600);
   }
+}
+
+function renderCartMode() {
+  document.getElementById('classSelectGroup').style.display = 'none';
+  document.getElementById('classBanner').style.display = 'none';
+  document.getElementById('cartClassesBanner').style.display = 'block';
+
+  const sorted = [...cartClasses].sort((a, b) =>
+    new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`)
+  );
+
+  document.getElementById('cartClassesList').innerHTML = sorted.map((cls, i) => {
+    const spotsLeft = cls.capacity - cls.registeredCount;
+    return `
+      <div style="display:flex;align-items:center;gap:0.75rem;padding:0.65rem 0;border-bottom:1px solid var(--border)">
+        <div style="width:26px;height:26px;background:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span style="color:#fff;font-size:0.7rem;font-weight:700">${i + 1}</span>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:0.9rem;color:var(--charcoal)">${cls.title}</div>
+          <div style="font-size:0.78rem;color:var(--mid)">${formatDate(cls.date)} · ${formatTime(cls.time)} · ${cls.duration} min</div>
+        </div>
+        <span style="font-size:0.78rem;color:${spotsLeft <= 3 ? 'var(--red)' : 'var(--mid)'};flex-shrink:0">${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} left</span>
+      </div>`;
+  }).join('');
+
+  const n = cartClasses.length;
+  document.getElementById('cartTotalDisplay').textContent =
+    `${n} class${n !== 1 ? 'es' : ''} selected · $${n * 25} CAD pay-per-class`;
 }
 
 function formatDate(dateStr) {
@@ -322,14 +369,14 @@ async function submitForm(e) {
   alertBox.style.display = 'none';
 
   const body = {
-    classId: document.getElementById('classSelect').value,
+    classId: cartClasses.length > 0 ? cartClasses[0].id : document.getElementById('classSelect').value,
     firstName: document.getElementById('firstName').value.trim(),
     lastName: document.getElementById('lastName').value.trim(),
     email: document.getElementById('email').value.trim(),
     phone: document.getElementById('phone').value.trim()
   };
 
-  if (!body.classId || !body.firstName || !body.lastName || !body.email) {
+  if (!body.firstName || !body.lastName || !body.email || (cartClasses.length === 0 && !body.classId)) {
     alertBox.className = 'alert alert-error';
     alertBox.textContent = 'Please fill in all required fields.';
     alertBox.style.display = 'block';
@@ -375,10 +422,12 @@ async function submitForm(e) {
     btn.textContent = 'Confirm Booking';
     btn.disabled = false;
 
-    if (balance > 0) {
-      // Show credit confirmation modal
-      document.getElementById('creditModalText').textContent =
-        `You have ${balance} class credit${balance !== 1 ? 's' : ''} remaining. Use 1 credit to confirm this booking — no payment needed!`;
+    const needed = cartClasses.length > 0 ? cartClasses.length : 1;
+    if (balance >= needed) {
+      const credText = needed > 1
+        ? `You have ${balance} class credits. Use ${needed} credits to book all ${needed} classes — no payment needed!`
+        : `You have ${balance} class credit${balance !== 1 ? 's' : ''} remaining. Use 1 credit to confirm this booking — no payment needed!`;
+      document.getElementById('creditModalText').textContent = credText;
       document.getElementById('creditModal').style.display = 'flex';
     } else {
       showPaymentModal();
@@ -393,6 +442,13 @@ async function submitForm(e) {
 }
 
 function showPaymentModal() {
+  // Update single-class price if booking multiple via cart
+  const n = cartClasses.length || 1;
+  if (n > 1) {
+    document.getElementById('singlePayTitle').textContent = 'Pay Per Class';
+    document.getElementById('singlePayDesc').textContent = `${n} classes · $25 each`;
+    document.getElementById('singlePayPrice').textContent = `$${n * 25}`;
+  }
   document.getElementById('creditModal').style.display = 'none';
   document.getElementById('paymentModal').style.display = 'flex';
 }
@@ -404,30 +460,128 @@ function closePaymentModal() {
 
 async function doSubmit(packageType) {
   closePaymentModal();
-  const body = { ...window._pendingBookingBody, packageType };
   const alertBox = document.getElementById('alertBox');
   alertBox.style.display = 'none';
 
-  try {
-    const res = await fetch('/api/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await res.json();
+  if (cartClasses.length > 0) {
+    // Cart mode — submit each class in sequence
+    let successCount = 0;
+    let lastCreditsRemaining;
+    let lastError = '';
 
-    if (res.ok) {
-      showSuccess(body.firstName, body.lastName, body.classId, packageType, data.creditsRemaining);
+    for (const cls of cartClasses) {
+      const body = { ...window._pendingBookingBody, classId: cls.id, packageType };
+      try {
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          successCount++;
+          lastCreditsRemaining = data.creditsRemaining;
+        } else {
+          lastError = data.error || 'Something went wrong.';
+        }
+      } catch {
+        lastError = 'Network error. Please check your connection.';
+      }
+    }
+
+    if (successCount === cartClasses.length) {
+      sessionStorage.removeItem('scheduleCart');
+      showCartSuccess(window._pendingBookingBody.firstName, cartClasses, packageType, lastCreditsRemaining);
     } else {
       alertBox.className = 'alert alert-error';
-      alertBox.textContent = data.error || 'Something went wrong. Please try again.';
+      alertBox.textContent = lastError || 'Some classes could not be booked. Please try again.';
       alertBox.style.display = 'block';
     }
-  } catch {
-    alertBox.className = 'alert alert-error';
-    alertBox.textContent = 'Network error. Please check your connection and try again.';
-    alertBox.style.display = 'block';
+  } else {
+    // Single class mode
+    const body = { ...window._pendingBookingBody, packageType };
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        showSuccess(body.firstName, body.lastName, body.classId, packageType, data.creditsRemaining);
+      } else {
+        alertBox.className = 'alert alert-error';
+        alertBox.textContent = data.error || 'Something went wrong. Please try again.';
+        alertBox.style.display = 'block';
+      }
+    } catch {
+      alertBox.className = 'alert alert-error';
+      alertBox.textContent = 'Network error. Please check your connection and try again.';
+      alertBox.style.display = 'block';
+    }
   }
+}
+
+function showCartSuccess(firstName, classes, packageType, creditsRemaining) {
+  const card = document.getElementById('formCard');
+  const n = classes.length;
+  const sorted = [...classes].sort((a, b) =>
+    new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`)
+  );
+
+  let paymentBlock = '';
+  if (packageType === 'credit') {
+    paymentBlock = `
+      <div style="background:#e8f5e9;border-radius:10px;padding:1.25rem;margin-bottom:1.5rem">
+        <p style="font-size:0.8rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#2e7d32;margin-bottom:0.4rem">✅ Credits Applied</p>
+        <p style="font-size:0.93rem;color:#1b5e20;margin:0">${n} class credit${n !== 1 ? 's' : ''} used — <strong>${creditsRemaining ?? 0} credit${creditsRemaining !== 1 ? 's' : ''} remaining</strong>.</p>
+      </div>`;
+  } else if (packageType === '4pack') {
+    paymentBlock = `
+      <div style="width:60px;height:1px;background:var(--border);margin:0 auto 1.5rem"></div>
+      <p style="font-size:0.8rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--mid);margin-bottom:0.5rem">SECURE YOUR SPOTS</p>
+      <p style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:#820000;margin-bottom:0.75rem">$85 CAD</p>
+      <p style="font-size:0.9rem;color:var(--mid);margin-bottom:0.25rem">Send via Interac e-Transfer to</p>
+      <p style="font-size:1.05rem;font-weight:700;color:var(--charcoal);margin-bottom:0.75rem">amanda@redmaplemovement.ca</p>
+      <p style="font-size:0.82rem;color:var(--mid);margin-bottom:1.5rem">Once payment is confirmed, 3 credits will be added to your account for future classes.</p>`;
+  } else {
+    const total = n * 25;
+    paymentBlock = `
+      <div style="width:60px;height:1px;background:var(--border);margin:0 auto 1.5rem"></div>
+      <p style="font-size:0.8rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--mid);margin-bottom:0.5rem">SECURE YOUR SPOTS</p>
+      <p style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:#820000;margin-bottom:0.75rem">$${total} CAD</p>
+      <p style="font-size:0.9rem;color:var(--mid);margin-bottom:0.25rem">Send via Interac e-Transfer to</p>
+      <p style="font-size:1.05rem;font-weight:700;color:var(--charcoal);margin-bottom:1.5rem">amanda@redmaplemovement.ca</p>`;
+  }
+
+  card.innerHTML = `
+    <div style="text-align:center;padding:2.5rem 2rem">
+      <p class="subtitle" style="font-size:0.8rem;letter-spacing:0.14em;margin-bottom:1rem">MOVE. BREATHE. TRANSFORM.</p>
+      <h2 style="font-family:'Playfair Display',serif;font-size:2rem;margin-bottom:0.75rem;line-height:1.2">
+        You're All Set,<br>${firstName}!
+      </h2>
+      <p style="color:var(--mid);margin-bottom:1.5rem">
+        ${packageType === 'credit' ? 'Your bookings are confirmed.' : `Your spot${n !== 1 ? 's are' : ' is'} being held while payment is completed.`}
+      </p>
+      <div style="text-align:left;background:var(--cream);border-radius:10px;padding:0.25rem 1rem;margin-bottom:1.5rem">
+        ${sorted.map(cls => `
+          <div style="display:flex;gap:0.75rem;padding:0.6rem 0;border-bottom:1px solid var(--border);align-items:center">
+            <span style="color:var(--red);font-weight:700;font-size:1rem">✓</span>
+            <div>
+              <div style="font-weight:700;font-size:0.88rem;color:var(--charcoal)">${cls.title}</div>
+              <div style="font-size:0.78rem;color:var(--mid)">${formatDate(cls.date)} · ${formatTime(cls.time)}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      ${paymentBlock}
+      <p style="font-size:0.8rem;color:var(--light);margin-bottom:2rem">Cancellations made more than 24 hours before class start are fully refundable. <a href="cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
+      <div style="display:flex;flex-direction:column;gap:0.75rem">
+        <a href="my-schedule.html" class="btn btn-primary" style="width:100%;text-align:center">View My Schedule</a>
+        <a href="schedule.html" class="btn btn-outline" style="width:100%;text-align:center">← Back to Schedule</a>
+      </div>
+    </div>`;
 }
 
 function showSuccess(firstName, lastName, classId, packageType, creditsRemaining) {
