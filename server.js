@@ -364,8 +364,11 @@ async function sendCreditBookingEmail({ to, firstName, cls, creditsRemaining }) 
 }
 
 async function sendPasswordResetEmail({ to, firstName, resetUrl }) {
-  if (!process.env.RESEND_API_KEY) return;
-  await getResend().emails.send({
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('[sendPasswordResetEmail] RESEND_API_KEY not set — skipping send');
+    return { skipped: 'no-api-key' };
+  }
+  const result = await getResend().emails.send({
     from: FROM_ADDRESS,
     to,
     subject: 'Reset your Red Maple Movement password',
@@ -383,6 +386,7 @@ async function sendPasswordResetEmail({ to, firstName, resetUrl }) {
       buttonUrl: resetUrl
     })
   });
+  return result;
 }
 
 async function sendPackageConfirmedEmail({ to, firstName, cls, creditsRemaining }) {
@@ -781,15 +785,19 @@ async function createApp() {
   app.post('/auth/forgot-password', async (req, res) => {
     const { email } = req.body || {};
     if (!email) return res.status(400).json({ error: 'Email is required.' });
+    const trimmedEmail = email.trim();
     try {
       const { rows } = await pool.query(
         'SELECT id, email, first_name, password_hash FROM users WHERE LOWER(email) = LOWER($1)',
-        [email.trim()]
+        [trimmedEmail]
       );
-      if (rows.length) {
+      if (!rows.length) {
+        console.log(`[forgot-password] No user found for email "${trimmedEmail}" — silently returning success.`);
+      } else {
         const user = rows[0];
-        // If they only have social login (no password_hash), skip — but still return success
-        if (user.password_hash) {
+        if (!user.password_hash) {
+          console.log(`[forgot-password] User ${user.email} (id=${user.id}) has no password_hash (social login only) — skipping email.`);
+        } else {
           // Invalidate any prior unused tokens for this user
           await pool.query(
             `UPDATE password_resets SET used_at = NOW()
@@ -804,8 +812,14 @@ async function createApp() {
             [tokenHash, user.id, expires]
           );
           const resetUrl = `${APP_URL}/reset-password.html?token=${token}`;
-          sendPasswordResetEmail({ to: user.email, firstName: user.first_name, resetUrl })
-            .catch(e => console.error('Reset email error:', e.message));
+          console.log(`[forgot-password] Sending reset email to ${user.email} (id=${user.id}). RESEND_API_KEY present: ${!!process.env.RESEND_API_KEY}`);
+          // Await so we can surface Resend errors in the response logs immediately
+          try {
+            const result = await sendPasswordResetEmail({ to: user.email, firstName: user.first_name, resetUrl });
+            console.log(`[forgot-password] Resend result for ${user.email}:`, JSON.stringify(result));
+          } catch (e) {
+            console.error(`[forgot-password] Resend error for ${user.email}:`, e?.message, e?.response?.body || '');
+          }
         }
       }
       // Always respond success for privacy
