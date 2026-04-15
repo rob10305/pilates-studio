@@ -433,11 +433,6 @@ async function initDB() {
     ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_alert_sent BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 
-  // Clean up: remove all classes except our official April schedule
-  try {
-    await pool.query(`DELETE FROM classes WHERE id NOT IN ('1010','1011','1012','1013','1014')`);
-  } catch (e) { console.error('Class cleanup error (non-fatal):', e.message); }
-
   // Ensure April classes exist (upsert)
   const aprilClasses = [
     ['1010','Mat Pilates','Amanda','2026-04-02','11:00',50,12,'Private Booking'],
