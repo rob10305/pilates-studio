@@ -11,6 +11,8 @@
   <meta name="twitter:card" content="summary">
   <meta name="twitter:image" content="https://pilates-studio-inky.vercel.app/images/logo.png">
   <link rel="stylesheet" href="css/styles.css?v=3">
+  <!-- Chart.js (loaded once, used only on the Analytics view) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
   <style>
     .admin-card-header {
       cursor: pointer;
@@ -285,6 +287,57 @@
       gap: 1.5rem;
     }
 
+    /* Analytics — KPI strip + chart grid */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .kpi {
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+    }
+    .kpi-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--mid);
+      margin-bottom: 0.35rem;
+    }
+    .kpi-value {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: var(--charcoal);
+      line-height: 1;
+      margin-bottom: 0.3rem;
+    }
+    .kpi-sub { font-size: 0.8rem; color: var(--mid); }
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 900px) {
+      .chart-grid { grid-template-columns: 1fr; }
+    }
+    .chart-cell {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.1rem 1.25rem;
+    }
+    .chart-cell h4 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--charcoal);
+      margin: 0 0 0.75rem;
+    }
+
     /* ===== Mobile: sidebar becomes overlay ===== */
     @media (max-width: 900px) {
       .admin-shell { grid-template-columns: 1fr; }
@@ -349,6 +402,9 @@
       <a href="#users"     data-view="users">
         <span class="si-icon">👥</span><span class="si-label">Users</span>
         <span class="si-count" id="sideCountUsers"></span>
+      </a>
+      <a href="#analytics" data-view="analytics">
+        <span class="si-icon">📈</span><span class="si-label">Analytics</span>
       </a>
       <a href="#settings"  data-view="settings">
         <span class="si-icon">⚙️</span><span class="si-label">Settings</span>
@@ -581,6 +637,97 @@
     </div>
     </section>
 
+    <!-- ===== ANALYTICS VIEW ===== -->
+    <section class="admin-view" id="view-analytics" hidden>
+
+      <!-- Traffic (Vercel) -->
+      <div class="admin-card" style="margin-bottom:1.5rem">
+        <div class="admin-card-header">
+          <h3>🌐 Website Traffic</h3>
+        </div>
+        <div class="admin-card-body">
+          <p style="color:var(--mid);font-size:0.92rem;line-height:1.5;margin:0 0 1rem">
+            Pageviews, unique visitors, time on page, top pages, countries, and devices
+            are tracked by <strong>Vercel Web Analytics</strong>. Enable it once in the
+            Vercel dashboard — the tracking script is already installed on every page of
+            the site.
+          </p>
+          <p style="color:var(--mid);font-size:0.85rem;margin:0 0 1rem">
+            <strong>How to enable:</strong> Go to your Vercel dashboard → pick this
+            project → click the <em>Analytics</em> tab → click <em>Enable</em>.
+            After a few minutes you'll see pageviews, top pages, visitor countries,
+            devices, and referrers in real time.
+          </p>
+          <a href="https://vercel.com/dashboard" target="_blank" rel="noopener"
+             class="btn btn-primary" style="display:inline-block">
+            Open Vercel Analytics ↗
+          </a>
+        </div>
+      </div>
+
+      <!-- Business metrics -->
+      <div class="admin-card" style="margin-bottom:1.5rem">
+        <div class="admin-card-header">
+          <h3>📊 Bookings & Revenue</h3>
+          <button id="analyticsRefreshBtn" class="btn btn-outline btn-sm"
+                  onclick="loadAnalytics()" style="margin-left:auto">Refresh</button>
+        </div>
+        <div class="admin-card-body">
+          <div id="analyticsLoading" style="padding:2rem;text-align:center;color:var(--mid)">
+            Loading business metrics…
+          </div>
+          <div id="analyticsError" style="display:none;background:#fce4ec;border:1px solid #c62828;color:#c62828;border-radius:8px;padding:1rem;font-size:0.9rem"></div>
+          <div id="analyticsContent" style="display:none">
+
+            <!-- Headline KPIs -->
+            <div class="kpi-strip">
+              <div class="kpi">
+                <div class="kpi-label">Revenue (last 12 mo)</div>
+                <div class="kpi-value" id="kpiRevenue">—</div>
+                <div class="kpi-sub" id="kpiOutstanding"></div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">Bookings (last 12 mo)</div>
+                <div class="kpi-value" id="kpiBookings">—</div>
+                <div class="kpi-sub" id="kpiBookingsBreakdown"></div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">Cancellation rate</div>
+                <div class="kpi-value" id="kpiCancelRate">—</div>
+                <div class="kpi-sub" id="kpiCancelBuckets"></div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">New signups (last 12 mo)</div>
+                <div class="kpi-value" id="kpiSignups">—</div>
+              </div>
+            </div>
+
+            <!-- Charts grid -->
+            <div class="chart-grid">
+              <div class="chart-cell">
+                <h4>Bookings over time</h4>
+                <canvas id="chartBookings" height="200"></canvas>
+              </div>
+              <div class="chart-cell">
+                <h4>Revenue over time (collected vs. outstanding)</h4>
+                <canvas id="chartRevenue" height="200"></canvas>
+              </div>
+              <div class="chart-cell">
+                <h4>Most popular classes</h4>
+                <canvas id="chartPopularClasses" height="200"></canvas>
+              </div>
+              <div class="chart-cell">
+                <h4>Most popular time slots</h4>
+                <canvas id="chartPopularTimes" height="200"></canvas>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </section>
+
     <!-- ===== SETTINGS VIEW ===== -->
     <section class="admin-view" id="view-settings" hidden>
     <div class="admin-grid">
@@ -732,12 +879,13 @@ function renderDashboardInsights(classes, registrations) {
 }
 
 // ===== Sidebar view switching =====
-const VIEWS = ['dashboard', 'classes', 'payments', 'users', 'settings'];
+const VIEWS = ['dashboard', 'classes', 'payments', 'users', 'analytics', 'settings'];
 const VIEW_TITLES = {
   dashboard: 'Dashboard',
   classes:   'Classes',
   payments:  'Pending Payments',
   users:     'Users',
+  analytics: 'Analytics',
   settings:  'Settings'
 };
 
@@ -755,6 +903,160 @@ function showView(name) {
   if (history.replaceState) history.replaceState(null, '', `#${name}`);
   document.body.classList.remove('admin-sidebar-open');
   window.scrollTo(0, 0);
+
+  // Lazy-load analytics the first time the user opens it
+  if (name === 'analytics' && !window._analyticsLoaded) {
+    loadAnalytics();
+  }
+}
+
+// ===== Analytics view =====
+window._analyticsCharts = {};   // keep Chart.js instances so we can destroy on reload
+window._analyticsLoaded = false;
+
+async function loadAnalytics() {
+  const loadingEl = document.getElementById('analyticsLoading');
+  const errorEl   = document.getElementById('analyticsError');
+  const contentEl = document.getElementById('analyticsContent');
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (errorEl)   errorEl.style.display   = 'none';
+  if (contentEl) contentEl.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/admin/analytics');
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    const data = await res.json();
+
+    // Wait for Chart.js if still loading
+    if (typeof Chart === 'undefined') {
+      await new Promise(r => {
+        const tick = () => (typeof Chart !== 'undefined' ? r() : setTimeout(tick, 50));
+        tick();
+      });
+    }
+
+    renderAnalytics(data);
+    window._analyticsLoaded = true;
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (contentEl) contentEl.style.display = 'block';
+  } catch (e) {
+    console.error('Analytics load error:', e);
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (errorEl) {
+      errorEl.textContent = 'Could not load analytics. ' + (e.message || '');
+      errorEl.style.display = 'block';
+    }
+  }
+}
+
+function renderAnalytics(d) {
+  // Headline KPIs
+  const totalRevenue     = d.revenueOverTime.reduce((s, r) => s + (r.collected || 0), 0);
+  const totalOutstanding = d.revenueOverTime.reduce((s, r) => s + (r.outstanding || 0), 0);
+  const totalBookings    = d.bookingsOverTime.reduce((s, r) => s + (r.total || 0), 0);
+  const totalPack        = d.bookingsOverTime.reduce((s, r) => s + (r.pack4 || 0), 0);
+  const totalSingle      = d.bookingsOverTime.reduce((s, r) => s + (r.single || 0), 0);
+  const totalCredit      = d.bookingsOverTime.reduce((s, r) => s + (r.credit || 0), 0);
+  const totalSignups     = d.signupsOverTime.reduce((s, r) => s + (r.count || 0), 0);
+
+  document.getElementById('kpiRevenue').textContent = `$${totalRevenue.toLocaleString()}`;
+  document.getElementById('kpiOutstanding').textContent =
+    totalOutstanding > 0 ? `$${totalOutstanding.toLocaleString()} outstanding` : 'All collected ✓';
+  document.getElementById('kpiBookings').textContent = totalBookings.toLocaleString();
+  document.getElementById('kpiBookingsBreakdown').textContent =
+    `${totalSingle} drop-in · ${totalPack} 4-pack · ${totalCredit} credit`;
+  document.getElementById('kpiCancelRate').textContent = `${d.cancellation.ratePercent}%`;
+  document.getElementById('kpiCancelBuckets').textContent =
+    `${d.cancellation.cancelled} cancelled · ${d.cancellation.within24h} within 24h`;
+  document.getElementById('kpiSignups').textContent = totalSignups.toLocaleString();
+
+  // Destroy any previous chart instances (on refresh)
+  Object.values(window._analyticsCharts).forEach(c => c && c.destroy && c.destroy());
+  window._analyticsCharts = {};
+
+  const red  = getComputedStyle(document.documentElement).getPropertyValue('--red').trim() || '#820000';
+  const cream= '#e6d7a3';
+  const grey = '#9aa0a6';
+
+  // Bookings over time (stacked bar: drop-in / 4-pack / credit)
+  const monthLabels = d.bookingsOverTime.map(r => formatMonth(r.month));
+  window._analyticsCharts.bookings = new Chart(document.getElementById('chartBookings'), {
+    type: 'bar',
+    data: {
+      labels: monthLabels,
+      datasets: [
+        { label: 'Drop-in', data: d.bookingsOverTime.map(r => r.single), backgroundColor: grey,  stack: 's' },
+        { label: '4-Pack',  data: d.bookingsOverTime.map(r => r.pack4),  backgroundColor: red,   stack: 's' },
+        { label: 'Credit',  data: d.bookingsOverTime.map(r => r.credit), backgroundColor: cream, stack: 's' }
+      ]
+    },
+    options: commonChartOpts({ stacked: true })
+  });
+
+  // Revenue over time (stacked bar: collected vs outstanding)
+  const revLabels = d.revenueOverTime.map(r => formatMonth(r.month));
+  window._analyticsCharts.revenue = new Chart(document.getElementById('chartRevenue'), {
+    type: 'bar',
+    data: {
+      labels: revLabels,
+      datasets: [
+        { label: 'Collected',   data: d.revenueOverTime.map(r => r.collected),   backgroundColor: red,     stack: 'r' },
+        { label: 'Outstanding', data: d.revenueOverTime.map(r => r.outstanding), backgroundColor: '#ffc29a', stack: 'r' }
+      ]
+    },
+    options: commonChartOpts({ stacked: true, currency: true })
+  });
+
+  // Most popular class titles (horizontal bar)
+  window._analyticsCharts.popularClasses = new Chart(document.getElementById('chartPopularClasses'), {
+    type: 'bar',
+    data: {
+      labels: d.popularByTitle.map(r => r.label || '(unknown)'),
+      datasets: [{ label: 'Bookings', data: d.popularByTitle.map(r => r.count), backgroundColor: red }]
+    },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // Most popular time slots (horizontal bar)
+  window._analyticsCharts.popularTimes = new Chart(document.getElementById('chartPopularTimes'), {
+    type: 'bar',
+    data: {
+      labels: d.popularByTime.map(r => formatTime(r.label || '00:00')),
+      datasets: [{ label: 'Bookings', data: d.popularByTime.map(r => r.count), backgroundColor: cream }]
+    },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+}
+
+function commonChartOpts({ stacked = false, currency = false } = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+      tooltip: currency ? {
+        callbacks: { label: ctx => `${ctx.dataset.label}: $${ctx.raw}` }
+      } : {}
+    },
+    scales: {
+      x: { stacked, grid: { display: false } },
+      y: {
+        stacked, beginAtZero: true,
+        ticks: currency ? { callback: v => '$' + v } : { precision: 0 }
+      }
+    }
+  };
+}
+
+function formatMonth(yyyymm) {
+  if (!yyyymm) return '';
+  const [y, m] = yyyymm.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(m) - 1]} ${y.slice(2)}`;
 }
 
 // Wire sidebar clicks + insight-sublink "→" links
@@ -1791,5 +2093,7 @@ document.addEventListener('DOMContentLoaded', () => { init(); renderDatePicker()
   })();
 </script>
 <script src="js/auth.js"></script>
+<!-- Vercel Web Analytics — enable in Vercel dashboard → Analytics tab -->
+<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>

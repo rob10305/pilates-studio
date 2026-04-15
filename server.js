@@ -1270,6 +1270,125 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
+  // Admin: business analytics — bookings over time, revenue, cancellation,
+  // popular classes. All computed from Postgres on demand.
+  app.get('/api/admin/analytics', requireAdmin, async (req, res) => {
+    try {
+      // Bookings per month (last 12 months) — split by package type
+      const { rows: bookings } = await pool.query(`
+        SELECT to_char(date_trunc('month', c.date::date), 'YYYY-MM') AS month,
+               COUNT(*)::int                                           AS total,
+               COUNT(*) FILTER (WHERE r.package_type = '4pack')::int   AS pack4,
+               COUNT(*) FILTER (WHERE r.package_type = 'single')::int  AS single,
+               COUNT(*) FILTER (WHERE r.package_type = 'credit')::int  AS credit
+        FROM registrations r
+        JOIN classes c ON c.id = r."classId"
+        WHERE c.date::date >= (CURRENT_DATE - INTERVAL '12 months')
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `);
+
+      // Revenue per month. Single = $25 paid, 4pack = $85 paid (once),
+      // credit = $0 (already paid via bundle). Separate paid vs pending.
+      const { rows: revenue } = await pool.query(`
+        SELECT to_char(date_trunc('month', c.date::date), 'YYYY-MM') AS month,
+               COALESCE(SUM(
+                 CASE WHEN r.payment_status = 'paid' THEN
+                   CASE r.package_type
+                     WHEN '4pack' THEN 85
+                     WHEN 'single' THEN 25
+                     ELSE 0 END
+                 ELSE 0 END
+               ), 0)::int AS collected,
+               COALESCE(SUM(
+                 CASE WHEN r.payment_status != 'paid' THEN
+                   CASE r.package_type
+                     WHEN '4pack' THEN 85
+                     WHEN 'single' THEN 25
+                     ELSE 0 END
+                 ELSE 0 END
+               ), 0)::int AS outstanding
+        FROM registrations r
+        JOIN classes c ON c.id = r."classId"
+        WHERE c.date::date >= (CURRENT_DATE - INTERVAL '12 months')
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `);
+
+      // Cancellation stats — compare active + cancelled over the same 12-month window
+      const { rows: activeTot } = await pool.query(`
+        SELECT COUNT(*)::int AS n FROM registrations r
+        JOIN classes c ON c.id = r."classId"
+        WHERE c.date::date >= (CURRENT_DATE - INTERVAL '12 months')
+      `);
+      const { rows: cancelTot } = await pool.query(`
+        SELECT COUNT(*)::int AS n FROM cancelled_registrations
+        WHERE cancelled_at >= (NOW() - INTERVAL '12 months')
+      `);
+      // Within/outside 24-hour bucket — use cancelled_at vs. class_date+class_time
+      const { rows: cancelBuckets } = await pool.query(`
+        SELECT
+          SUM(CASE
+                WHEN (class_date || 'T' || class_time)::timestamp - cancelled_at <= INTERVAL '24 hours'
+                THEN 1 ELSE 0 END)::int AS within_24h,
+          SUM(CASE
+                WHEN (class_date || 'T' || class_time)::timestamp - cancelled_at >  INTERVAL '24 hours'
+                THEN 1 ELSE 0 END)::int AS outside_24h
+        FROM cancelled_registrations
+        WHERE cancelled_at >= (NOW() - INTERVAL '12 months')
+          AND class_date IS NOT NULL AND class_time IS NOT NULL
+      `);
+      const totalBookings = (activeTot[0]?.n || 0) + (cancelTot[0]?.n || 0);
+      const cancelled    = cancelTot[0]?.n || 0;
+      const cancelRate   = totalBookings > 0 ? Math.round((cancelled / totalBookings) * 1000) / 10 : 0;
+
+      // Most popular classes — by title, aggregated across all time
+      const { rows: popularByTitle } = await pool.query(`
+        SELECT c.title AS label, COUNT(*)::int AS count
+        FROM registrations r
+        JOIN classes c ON c.id = r."classId"
+        GROUP BY 1
+        ORDER BY count DESC
+        LIMIT 10
+      `);
+
+      // Most popular time slots (hour of day)
+      const { rows: popularByTime } = await pool.query(`
+        SELECT substring(c.time, 1, 5) AS label, COUNT(*)::int AS count
+        FROM registrations r
+        JOIN classes c ON c.id = r."classId"
+        GROUP BY 1
+        ORDER BY count DESC
+        LIMIT 10
+      `);
+
+      // New user signups per month (last 12 months)
+      const { rows: signups } = await pool.query(`
+        SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+               COUNT(*)::int AS count
+        FROM users
+        WHERE created_at >= (NOW() - INTERVAL '12 months')
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `);
+
+      res.json({
+        bookingsOverTime: bookings,
+        revenueOverTime: revenue,
+        cancellation: {
+          totalBookings,
+          cancelled,
+          ratePercent: cancelRate,
+          within24h: cancelBuckets[0]?.within_24h || 0,
+          outside24h: cancelBuckets[0]?.outside_24h || 0
+        },
+        popularByTitle,
+        popularByTime,
+        signupsOverTime: signups
+      });
+    } catch (e) { console.error('Analytics error:', e); res.status(500).json({ error: 'Server error' }); }
+  });
+
   // Admin: mark a registration as paid
   app.post('/api/admin/registrations/:id/mark-paid', requireAdmin, async (req, res) => {
     try {
