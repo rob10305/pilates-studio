@@ -245,6 +245,11 @@ if (params.get('waiverDone') === '1') {
     pendingAutoSubmit = JSON.parse(saved);
     sessionStorage.removeItem('pendingBooking');
   }
+  // Replace the waiver warning box with a signed confirmation
+  // so it never shows the orange prompt again on this visit
+  const box = document.getElementById('waiverRequired');
+  box.className = 'waiver-done-banner';
+  box.innerHTML = '✅ &nbsp;Waiver signed — your booking is being confirmed.';
 }
 
 async function loadClasses() {
@@ -396,7 +401,7 @@ async function submitForm(e) {
     const waiverRes = await fetch(`/api/waiver/check?email=${encodeURIComponent(body.email)}`);
     const waiverData = await waiverRes.json();
 
-    if (!waiverData.signed) {
+    if (!waiverData.signed && params.get('waiverDone') !== '1') {
       // Save booking state so we can resume after waiver is signed
       sessionStorage.setItem('pendingBooking', JSON.stringify(body));
 
@@ -404,10 +409,13 @@ async function submitForm(e) {
       const returnUrl = `register.html?classId=${encodeURIComponent(body.classId)}&waiverDone=1`;
       document.getElementById('waiverLink').href = `waiver.html?returnTo=${encodeURIComponent(returnUrl)}`;
 
+      alertBox.className = 'alert alert-error';
+      alertBox.textContent = 'A waiver is required before booking — please sign below to continue.';
+      alertBox.style.display = 'block';
       document.getElementById('waiverRequired').style.display = 'flex';
       btn.textContent = 'Confirm Booking';
       btn.disabled = false;
-      document.getElementById('waiverRequired').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      document.getElementById('waiverRequired').scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
   } catch (_) {
