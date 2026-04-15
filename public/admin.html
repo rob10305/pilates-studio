@@ -463,7 +463,7 @@ function renderPendingPayments(classes, registrations) {
   const count = document.getElementById('pendingCount');
 
   const pending = registrations
-    .filter(r => r.payment_status !== 'paid')
+    .filter(r => r.paymentStatus !== 'paid')
     .map(r => {
       const cls = classes.find(c => c.id === r.classId);
       return { ...r, cls };
@@ -1117,7 +1117,7 @@ function loadRoster() {
       </thead>
       <tbody>
         ${regs.map(r => {
-          const paid = r.payment_status === 'paid';
+          const paid = r.paymentStatus === 'paid';
           const payBadge = paid
             ? '<span style="background:#d4edda;color:#155724;font-size:0.72rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:50px">Paid</span>'
             : '<span style="background:#fff3cd;color:#856404;font-size:0.72rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:50px">Pending</span>';
