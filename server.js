@@ -1084,6 +1084,11 @@ async function createApp() {
         imgSrc: ["'self'", 'data:', 'https:'],
         mediaSrc: ["'self'"],
         connectSrc: ["'self'", 'https://*.clarity.ms', 'https://*.vercel-insights.com'],
+        // frame-src controls iframes embedded BY our pages. Without this,
+        // default-src 'self' blocks the Google Maps studio-location embed on
+        // schedule.html. frameAncestors below still prevents OTHER sites from
+        // embedding us (clickjacking defense) — those are independent directives.
+        frameSrc: ["'self'", 'https://www.google.com', 'https://maps.google.com'],
         frameAncestors: ["'none'"],
         formAction: ["'self'"],
         baseUri: ["'self'"],
