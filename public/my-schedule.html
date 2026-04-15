@@ -645,7 +645,7 @@ async function loadAccountSummary() {
     const res = await fetch('/api/my-account-summary');
     if (!res.ok) return;
     const data = await res.json();
-    const { creditBalance, bundleCount, pendingPayments } = data;
+    const { creditBalance, bundleCount, pendingPayments, pendingBundles = 0 } = data;
 
     // Only render the whole section if there's something useful to show
     // (either a bundle on record OR some pending payment)
@@ -674,6 +674,19 @@ async function loadAccountSummary() {
            <p class="summary-sub">Every booking on your account is paid in full. You're all set.</p>
          </div>`;
 
+    // Reusable 'credits added once payment is confirmed' line
+    const pendingBundleBlock = pendingBundles > 0
+      ? `<p style="margin-top:0.6rem;padding:0.55rem 0.75rem;background:#fff3e0;border:1px solid #ffe0b2;border-radius:6px;font-size:0.8rem;color:#8d4a00;line-height:1.45">
+          <strong>⏳ ${pendingBundles * 3} more credit${pendingBundles * 3 === 1 ? '' : 's'} pending</strong> —
+          will be added once payment for your 4-class bundle${pendingBundles > 1 ? 's' : ''} is received.
+         </p>`
+      : '';
+
+    const creditsConfirmedNote =
+      `<p style="margin-top:0.5rem;font-size:0.76rem;color:var(--mid);line-height:1.4;font-style:italic">
+         Class credits are reflected in your balance once payment is confirmed by the studio.
+       </p>`;
+
     // Bundle / credit card — only if they've ever purchased a 4-pack
     let bundleCard = '';
     if (bundleCount > 0) {
@@ -692,14 +705,21 @@ async function loadAccountSummary() {
           <div class="summary-progress" title="${creditBalance} of ${totalPurchased} remaining">
             <span style="width:${pct}%"></span>
           </div>
+          ${pendingBundleBlock}
+          ${creditsConfirmedNote}
         </div>`;
-    } else if (creditBalance > 0) {
-      // Credits awarded manually without a 4-pack on record
+    } else if (creditBalance > 0 || pendingBundles > 0) {
+      // Credits awarded manually without a 4-pack on record, OR a pending
+      // bundle that hasn't unlocked credits yet
       bundleCard = `
         <div class="summary-card has-credits">
           <p class="summary-label">🎟️ Class Credits</p>
           <p class="summary-value">${creditBalance} <span style="font-size:0.9rem;color:var(--mid);font-weight:600">available</span></p>
-          <p class="summary-sub">Your credits will be applied automatically when you book your next class.</p>
+          <p class="summary-sub">${creditBalance > 0
+            ? 'Your credits will be applied automatically when you book your next class.'
+            : 'No credits available yet.'}</p>
+          ${pendingBundleBlock}
+          ${creditsConfirmedNote}
         </div>`;
     }
 

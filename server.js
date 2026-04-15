@@ -1796,10 +1796,20 @@ async function createApp() {
         WHERE payment_status != 'paid' AND (user_id = $1 OR LOWER(email) = LOWER($2))
       `, [userId, email]);
 
+      // Count pending 4-pack bundle bookings specifically — each one will
+      // unlock 3 new credits once payment is marked received, so the
+      // Class Credits card can show the user what's coming.
+      const { rows: pendingBundles } = await pool.query(`
+        SELECT COUNT(*)::int AS n FROM registrations
+        WHERE package_type = '4pack' AND payment_status != 'paid'
+          AND (user_id = $1 OR LOWER(email) = LOWER($2))
+      `, [userId, email]);
+
       res.json({
         creditBalance,
         bundleCount,
-        pendingPayments: pending[0]?.n || 0
+        pendingPayments: pending[0]?.n || 0,
+        pendingBundles: pendingBundles[0]?.n || 0
       });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
