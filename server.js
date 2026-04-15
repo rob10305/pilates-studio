@@ -363,6 +363,28 @@ async function sendCreditBookingEmail({ to, firstName, cls, creditsRemaining }) 
   });
 }
 
+async function sendPasswordResetEmail({ to, firstName, resetUrl }) {
+  if (!process.env.RESEND_API_KEY) return;
+  await getResend().emails.send({
+    from: FROM_ADDRESS,
+    to,
+    subject: 'Reset your Red Maple Movement password',
+    html: emailWrap({
+      heading: 'Password Reset Request',
+      subtitle: `Hi ${firstName || 'there'} — click the button below to choose a new password.`,
+      detailRows: [],
+      body: `<p style="font-size:14px;color:#6b6b6b;margin:0 0 12px">
+               This link will expire in 1 hour and can only be used once.
+             </p>
+             <p style="font-size:13px;color:#b0b0b0;margin:0">
+               If you didn't request this, you can safely ignore this email — your password will stay the same.
+             </p>`,
+      buttonLabel: 'Choose a New Password',
+      buttonUrl: resetUrl
+    })
+  });
+}
+
 async function sendPackageConfirmedEmail({ to, firstName, cls, creditsRemaining }) {
   if (!process.env.RESEND_API_KEY) return;
   await getResend().emails.send({
@@ -525,6 +547,18 @@ async function initDB() {
       balance    INTEGER NOT NULL DEFAULT 0,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  // Password reset tokens
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS password_resets (
+      token_hash TEXT PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at    TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_pw_resets_user ON password_resets(user_id);
   `);
 
   // Cancelled registrations archive — preserves a record of cancelled bookings
@@ -740,6 +774,76 @@ async function createApp() {
         res.json({ user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name } });
       });
     })(req, res, next);
+  });
+
+  // Forgot password — send a one-time reset link by email.
+  // Always returns success (doesn't leak which emails exist).
+  app.post('/auth/forgot-password', async (req, res) => {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ error: 'Email is required.' });
+    try {
+      const { rows } = await pool.query(
+        'SELECT id, email, first_name, password_hash FROM users WHERE LOWER(email) = LOWER($1)',
+        [email.trim()]
+      );
+      if (rows.length) {
+        const user = rows[0];
+        // If they only have social login (no password_hash), skip — but still return success
+        if (user.password_hash) {
+          // Invalidate any prior unused tokens for this user
+          await pool.query(
+            `UPDATE password_resets SET used_at = NOW()
+             WHERE user_id = $1 AND used_at IS NULL`,
+            [user.id]
+          );
+          const token = crypto.randomBytes(32).toString('hex');
+          const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+          const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+          await pool.query(
+            `INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1,$2,$3)`,
+            [tokenHash, user.id, expires]
+          );
+          const resetUrl = `${APP_URL}/reset-password.html?token=${token}`;
+          sendPasswordResetEmail({ to: user.email, firstName: user.first_name, resetUrl })
+            .catch(e => console.error('Reset email error:', e.message));
+        }
+      }
+      // Always respond success for privacy
+      res.json({ success: true });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Reset password — consumes the one-time token and sets a new password
+  app.post('/auth/reset-password', async (req, res) => {
+    const { token, password } = req.body || {};
+    if (!token || !password)  return res.status(400).json({ error: 'Token and password are required.' });
+    if (password.length < 8)  return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    try {
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const { rows } = await pool.query(
+        `SELECT pr.user_id, pr.expires_at, pr.used_at, u.email, u.first_name, u.last_name
+         FROM password_resets pr
+         JOIN users u ON u.id = pr.user_id
+         WHERE pr.token_hash = $1`,
+        [tokenHash]
+      );
+      if (!rows.length) return res.status(400).json({ error: 'This reset link is invalid or has already been used.' });
+      const rec = rows[0];
+      if (rec.used_at) return res.status(400).json({ error: 'This reset link has already been used.' });
+      if (new Date(rec.expires_at) < new Date())
+        return res.status(400).json({ error: 'This reset link has expired. Please request a new one.' });
+
+      const hash = await bcrypt.hash(password, 12);
+      await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, rec.user_id]);
+      await pool.query('UPDATE password_resets SET used_at = NOW() WHERE token_hash = $1', [tokenHash]);
+
+      // Auto-login after reset
+      const { rows: userRows } = await pool.query('SELECT * FROM users WHERE id = $1', [rec.user_id]);
+      req.login(userRows[0], err => {
+        if (err) return res.json({ success: true, autoLogin: false });
+        res.json({ success: true, autoLogin: true, email: rec.email });
+      });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
   app.post('/auth/logout', (req, res, next) => {

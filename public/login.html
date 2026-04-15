@@ -115,6 +115,16 @@
         <p id="passwordHint" style="display:none;font-size:0.8rem;color:var(--mid);margin-top:0.35rem">Minimum 8 characters</p>
       </div>
 
+      <div class="form-group" id="confirmPasswordGroup" style="display:none">
+        <label for="passwordConfirm">Confirm Password *</label>
+        <input type="password" id="passwordConfirm" placeholder="········" autocomplete="new-password">
+        <p id="passwordMatchHint" style="display:none;font-size:0.8rem;color:#c62828;margin-top:0.35rem">Passwords do not match</p>
+      </div>
+
+      <p style="text-align:right;margin:-0.5rem 0 1rem" id="forgotPwRow">
+        <a href="forgot-password.html" style="color:var(--red);font-size:0.85rem;text-decoration:none">Forgot password?</a>
+      </p>
+
       <button type="submit" class="btn btn-primary form-submit" id="submitBtn">Sign In</button>
     </form>
 
@@ -202,17 +212,34 @@ function setMode(newMode) {
   mode = newMode;
   const isCreate = mode === 'create';
 
-  document.getElementById('nameFields').style.display   = isCreate ? 'block' : 'none';
-  document.getElementById('passwordHint').style.display = isCreate ? 'block' : 'none';
-  document.getElementById('submitBtn').textContent       = isCreate ? 'Create Account' : 'Sign In';
-  document.getElementById('pageTitle').textContent       = isCreate ? 'Create Account' : 'Sign In';
+  document.getElementById('nameFields').style.display           = isCreate ? 'block' : 'none';
+  document.getElementById('passwordHint').style.display         = isCreate ? 'block' : 'none';
+  document.getElementById('confirmPasswordGroup').style.display = isCreate ? 'block' : 'none';
+  document.getElementById('forgotPwRow').style.display          = isCreate ? 'none'  : 'block';
+  document.getElementById('submitBtn').textContent              = isCreate ? 'Create Account' : 'Sign In';
+  document.getElementById('pageTitle').textContent              = isCreate ? 'Create Account' : 'Sign In';
 
   document.getElementById('tabSignIn').classList.toggle('auth-tab--active', !isCreate);
   document.getElementById('tabCreate').classList.toggle('auth-tab--active',  isCreate);
 
   document.getElementById('password').autocomplete = isCreate ? 'new-password' : 'current-password';
+  document.getElementById('passwordMatchHint').style.display = 'none';
+  document.getElementById('passwordConfirm').value = '';
   document.getElementById('alertBox').style.display = 'none';
 }
+
+// Live match indicator as the user types the confirmation
+document.addEventListener('DOMContentLoaded', () => {
+  const pw = document.getElementById('password');
+  const pc = document.getElementById('passwordConfirm');
+  const hint = document.getElementById('passwordMatchHint');
+  function checkMatch() {
+    if (mode !== 'create' || !pc.value) { hint.style.display = 'none'; return; }
+    hint.style.display = (pw.value === pc.value) ? 'none' : 'block';
+  }
+  pw.addEventListener('input', checkMatch);
+  pc.addEventListener('input', checkMatch);
+});
 
 async function submitAuth(e) {
   e.preventDefault();
@@ -223,10 +250,12 @@ async function submitAuth(e) {
   if (!email || !password) return showAlert('Please enter your email and password.', 'error');
 
   if (mode === 'create') {
-    const firstName = document.getElementById('firstName').value.trim();
-    const lastName  = document.getElementById('lastName').value.trim();
-    if (!firstName || !lastName) return showAlert('Please enter your first and last name.', 'error');
-    if (password.length < 8)     return showAlert('Password must be at least 8 characters.', 'error');
+    const firstName       = document.getElementById('firstName').value.trim();
+    const lastName        = document.getElementById('lastName').value.trim();
+    const passwordConfirm = document.getElementById('passwordConfirm').value;
+    if (!firstName || !lastName)        return showAlert('Please enter your first and last name.', 'error');
+    if (password.length < 8)            return showAlert('Password must be at least 8 characters.', 'error');
+    if (password !== passwordConfirm)   return showAlert('Passwords do not match. Please re-enter them.', 'error');
 
     setLoading(true, 'Creating account...');
     try {
