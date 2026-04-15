@@ -692,7 +692,7 @@ function showCartSuccess(firstName, classes, packageType, creditsRemaining, acco
       <p style="color:var(--mid);margin-bottom:1.5rem">
         ${packageType === 'credit'
           ? 'Your bookings are confirmed.'
-          : `Your spot${n !== 1 ? 's are' : ' is'} being held while payment is completed. <span style="display:block;margin-top:0.5rem;font-size:0.88rem">Spot${n !== 1 ? 's' : ''} not paid within 1 hour may be released.</span>`}
+          : `Your spot${n !== 1 ? 's are' : ' is'} being held while payment is completed. <span style="display:block;margin-top:0.5rem;font-size:0.88rem">Spots not paid within 1 hour may be released.</span>`}
       </p>
       <div style="text-align:left;background:var(--cream);border-radius:10px;padding:0.25rem 1rem;margin-bottom:1.5rem">
         ${sorted.map(cls => `
