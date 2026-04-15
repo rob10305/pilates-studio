@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing — Red Maple Movement</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=2">
+  <style>
+    .pricing-hero {
+      background: var(--cream);
+      text-align: center;
+      padding: 5rem 5% 3.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .pricing-hero h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2rem, 5vw, 3rem);
+      color: var(--charcoal);
+      margin: 0 0 0.75rem;
+    }
+    .pricing-hero p {
+      font-size: 1.05rem;
+      color: var(--mid);
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    .pricing-section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 4rem 5% 5rem;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.75rem;
+    }
+
+    @media (max-width: 600px) {
+      .pricing-grid { grid-template-columns: 1fr; }
+    }
+
+    .pricing-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 2.25rem 2rem 2rem;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .pricing-card:hover {
+      box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+      transform: translateY(-2px);
+    }
+
+    /* Featured / recommended card */
+    .pricing-card.featured {
+      border-color: var(--red);
+      border-width: 2px;
+    }
+    .pricing-badge {
+      position: absolute;
+      top: -13px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--red);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.85rem;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .pricing-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      color: var(--red);
+      margin-bottom: 0.6rem;
+    }
+    .pricing-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.45rem;
+      color: var(--charcoal);
+      margin: 0 0 1.25rem;
+      line-height: 1.2;
+    }
+
+    .pricing-amount {
+      display: flex;
+      align-items: flex-end;
+      gap: 0.25rem;
+      margin-bottom: 0.4rem;
+    }
+    .pricing-amount .currency {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--charcoal);
+      line-height: 1.8;
+    }
+    .pricing-amount .price {
+      font-family: 'Playfair Display', serif;
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: var(--charcoal);
+      line-height: 1;
+    }
+    .pricing-amount .per {
+      font-size: 0.88rem;
+      color: var(--mid);
+      padding-bottom: 0.35rem;
+    }
+
+    .pricing-sub {
+      font-size: 0.85rem;
+      color: var(--mid);
+      margin-bottom: 1.75rem;
+    }
+
+    .pricing-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0 0 1.5rem;
+    }
+
+    .pricing-features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 2rem;
+      flex: 1;
+    }
+    .pricing-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      font-size: 0.93rem;
+      color: var(--charcoal);
+      margin-bottom: 0.75rem;
+      line-height: 1.45;
+    }
+    .pricing-features li::before {
+      content: '✓';
+      color: var(--red);
+      font-weight: 700;
+      font-size: 0.88rem;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+
+    .pricing-cta {
+      display: block;
+      text-align: center;
+      padding: 0.85rem 1.5rem;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .pricing-cta:hover { opacity: 0.85; }
+    .pricing-cta.primary {
+      background: var(--red);
+      color: #fff;
+    }
+    .pricing-cta.outline {
+      background: var(--cream);
+      color: var(--red);
+      border: 2px solid var(--red);
+    }
+
+    .pricing-note {
+      text-align: center;
+      margin-top: 2.5rem;
+      font-size: 0.88rem;
+      color: var(--mid);
+      line-height: 1.6;
+    }
+    .pricing-note a {
+      color: var(--red);
+      text-decoration: none;
+    }
+    .pricing-note a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></a>
+  <button class="nav-toggle" id="navToggle" aria-label="Open menu"><span></span><span></span><span></span></button>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="about.html">About Me</a></li>
+    <li><a href="schedule.html">Schedule</a></li>
+    <li><a href="pricing.html" class="active">Pricing</a></li>
+    <li><a href="waiver.html">Forms</a></li>
+    <li id="adminNav" style="display:none"><a href="admin.html">Admin</a></li>
+    <li id="myScheduleNav" style="display:none"><a href="my-schedule.html">My Schedule</a></li>
+    <li id="authNav"></li>
+  </ul>
+</nav>
+
+<div class="pricing-hero">
+  <p class="subtitle">Simple &amp; Transparent</p>
+  <h1>Pricing</h1>
+  <p>Choose the option that works best for you. No memberships, no commitments — just great Pilates.</p>
+</div>
+
+<div class="pricing-section">
+  <div class="pricing-grid">
+
+    <!-- Pay Per Class -->
+    <div class="pricing-card">
+      <p class="pricing-label">Drop-In</p>
+      <h2 class="pricing-title">Pay Per Class</h2>
+      <div class="pricing-amount">
+        <span class="currency">$</span>
+        <span class="price">22</span>
+        <span class="per">CAD / class</span>
+      </div>
+      <p class="pricing-sub">Perfect for trying it out or attending when you can.</p>
+      <hr class="pricing-divider">
+      <ul class="pricing-features">
+        <li>Single class booking</li>
+        <li>Full 50-minute session</li>
+        <li>Small group — up to 12 spots</li>
+        <li>No commitment required</li>
+      </ul>
+      <a href="register.html" class="pricing-cta outline">Book a Class</a>
+    </div>
+
+    <!-- Class Pack -->
+    <div class="pricing-card featured">
+      <span class="pricing-badge">Best Value</span>
+      <p class="pricing-label">Class Pack</p>
+      <h2 class="pricing-title">Book &amp; Save</h2>
+      <div class="pricing-amount">
+        <span class="currency">$</span>
+        <span class="price">80</span>
+        <span class="per">CAD / 4 classes</span>
+      </div>
+      <p class="pricing-sub">That's $20 per class — save $8 when you commit to four.</p>
+      <hr class="pricing-divider">
+      <ul class="pricing-features">
+        <li>4 classes bundled together</li>
+        <li>Full 50-minute sessions</li>
+        <li>Small group — up to 12 spots</li>
+        <li>Save $8 vs. drop-in rate</li>
+      </ul>
+      <a href="register.html" class="pricing-cta primary">Book 4 Classes</a>
+    </div>
+
+  </div>
+
+  <p class="pricing-note">
+    All classes are held at 43 Main Street South – Suite 2B, Campbellville, ON (Inside Glow by Nelly).<br>
+    Questions? Email us at <a href="mailto:amanda@redmaplemovement.ca">amanda@redmaplemovement.ca</a>
+  </p>
+</div>
+
+<footer>
+  <span class="nav-logo"><img src="images/logo.jpg" alt="Red Maple Movement Pilates" class="nav-logo-img"></span>
+  <p>Move with Intention. Transform with Strength.</p>
+  <p style="margin-bottom:0.5rem">Questions? Reach us at <a href="mailto:amanda@redmaplemovement.ca" style="color:var(--red-lt)">amanda@redmaplemovement.ca</a></p>
+  <div class="footer-links">
+    <a href="index.html">Home</a>
+    <a href="schedule.html">Schedule</a>
+    <a href="register.html">Book</a>
+    <a href="cancellation-policy.html">Cancellation Policy</a>
+  </div>
+  <div class="copyright">&copy; 2026 Red Maple Movement Studio. All rights reserved.</div>
+</footer>
+
+<!-- Bottom Mobile Nav -->
+<nav class="bottom-nav">
+  <a href="index.html">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
+    Home
+  </a>
+  <a href="schedule.html">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+    Schedule
+  </a>
+  <a href="pricing.html" class="active">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z"/></svg>
+    Pricing
+  </a>
+  <a href="my-schedule.html">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+    My Account
+  </a>
+</nav>
+
+<script>
+document.getElementById('navToggle').addEventListener('click', function() {
+  this.classList.toggle('open');
+  document.getElementById('navLinks').classList.toggle('open');
+});
+</script>
+<script src="js/auth.js"></script>
+</body>
+</html>
