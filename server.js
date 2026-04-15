@@ -797,6 +797,8 @@ async function createApp() {
     const { classId, firstName, lastName, email, phone, packageType, password } = req.body;
     if (!classId || !firstName || !lastName || !email)
       return res.status(400).json({ error: 'Missing required fields' });
+    if (!req.isAuthenticated() && (!password || password.length < 8))
+      return res.status(400).json({ error: 'Please create a password (min. 8 characters) to set up your account.' });
     try {
       const { rows: clsRows } = await pool.query('SELECT * FROM classes WHERE id = $1', [classId]);
       if (clsRows.length === 0) return res.status(404).json({ error: 'Class not found' });

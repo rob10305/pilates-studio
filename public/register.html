@@ -152,9 +152,9 @@
 
       <!-- Account creation (hidden once logged in) -->
       <div id="accountSection">
-        <div style="background:var(--cream);border-radius:var(--radius);border:1px solid var(--border);padding:1.25rem;margin-bottom:1.25rem">
-          <p style="font-size:0.9rem;font-weight:700;color:var(--charcoal);margin:0 0 0.2rem">🔐 Create your account <span style="font-size:0.78rem;font-weight:400;color:var(--mid)">(optional)</span></p>
-          <p style="font-size:0.82rem;color:var(--mid);margin:0 0 0.85rem;line-height:1.5">Set a password so you can log in and track your bookings anytime.</p>
+        <div style="background:var(--cream);border-radius:var(--radius);border:1.5px solid var(--red);padding:1.25rem;margin-bottom:1.25rem">
+          <p style="font-size:0.9rem;font-weight:700;color:var(--charcoal);margin:0 0 0.2rem">🔐 Create your account</p>
+          <p style="font-size:0.82rem;color:var(--mid);margin:0 0 0.85rem;line-height:1.5">A password is required to log in, view your schedule, and manage your class credits.</p>
           <div class="form-group" style="margin-bottom:0.75rem">
             <label for="newPassword" style="font-size:0.85rem">Password</label>
             <input type="password" id="newPassword" placeholder="Min. 8 characters" autocomplete="new-password" oninput="handlePasswordInput()">
@@ -249,6 +249,7 @@
 let allClasses = [];
 const cartIds = JSON.parse(sessionStorage.getItem('scheduleCart') || 'null');
 let cartClasses = [];
+let isLoggedIn = false;
 const params = new URLSearchParams(window.location.search);
 const preselectedId = params.get('classId');
 
@@ -312,6 +313,13 @@ async function loadClasses() {
     document.getElementById('lastName').value  = lastName;
     document.getElementById('email').value     = email;
     document.getElementById('phone').value     = phone || '';
+    // Restore password so account creation still works after waiver redirect
+    if (pendingAutoSubmit._savedPassword) {
+      const pwEl  = document.getElementById('newPassword');
+      const pwCEl = document.getElementById('newPasswordConfirm');
+      if (pwEl)  { pwEl.value  = pendingAutoSubmit._savedPassword; handlePasswordInput(); }
+      if (pwCEl) { pwCEl.value = pendingAutoSubmit._savedPassword; }
+    }
     if (classId && !cartIds) {
       const select = document.getElementById('classSelect');
       select.value = classId;
@@ -412,6 +420,25 @@ async function submitForm(e) {
     return;
   }
 
+  // Require a password for users who don't yet have an account
+  if (!isLoggedIn) {
+    const pw = document.getElementById('newPassword')?.value.trim() || '';
+    if (!pw) {
+      alertBox.className = 'alert alert-error';
+      alertBox.textContent = 'Please set a password to create your account before booking.';
+      alertBox.style.display = 'block';
+      document.getElementById('accountSection')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (pw.length < 8) {
+      alertBox.className = 'alert alert-error';
+      alertBox.textContent = 'Password must be at least 8 characters.';
+      alertBox.style.display = 'block';
+      document.getElementById('accountSection')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+  }
+
   const btn = document.getElementById('submitBtn');
   btn.textContent = 'Checking…';
   btn.disabled = true;
@@ -422,8 +449,9 @@ async function submitForm(e) {
     const waiverData = await waiverRes.json();
 
     if (!waiverData.signed && params.get('waiverDone') !== '1') {
-      // Save booking state so we can resume after waiver is signed
-      sessionStorage.setItem('pendingBooking', JSON.stringify(body));
+      // Save booking state (including password) so we can resume after waiver is signed
+      const _savedPassword = document.getElementById('newPassword')?.value.trim() || '';
+      sessionStorage.setItem('pendingBooking', JSON.stringify({ ...body, _savedPassword }));
 
       // Build return URL — waiver.html will redirect here after signing
       const returnUrl = `register.html?classId=${encodeURIComponent(body.classId)}&waiverDone=1`;
@@ -708,6 +736,7 @@ loadClasses();
       if (user.lastName)  document.getElementById('lastName').value  = user.lastName;
       if (user.email)     document.getElementById('email').value     = user.email;
       // Already signed in — hide account creation section
+      isLoggedIn = true;
       document.getElementById('accountSection').style.display = 'none';
       return;
     }
