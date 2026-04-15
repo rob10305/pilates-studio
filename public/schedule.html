@@ -487,10 +487,16 @@ function clearCart() {
   if (selectedDate) showClassesForDate(selectedDate);
 }
 
-function checkout() {
+async function checkout() {
   if (cartItems.length === 0) return;
   sessionStorage.setItem('scheduleCart', JSON.stringify(cartItems.map(c => c.id)));
-  window.location.href = 'register.html';
+  try {
+    const res = await fetch('/auth/me');
+    // Already logged in → go straight to booking
+    window.location.href = res.ok ? 'register.html' : 'login.html?returnTo=register.html';
+  } catch {
+    window.location.href = 'login.html?returnTo=register.html';
+  }
 }
 
 document.getElementById('prevMonth').addEventListener('click', () => {

@@ -38,6 +38,12 @@
 <div class="register-layout">
   <div class="form-card">
 
+    <!-- Cart context banner (shown when arriving from schedule checkout) -->
+    <div id="cartBanner" style="display:none;background:#fff8f8;border:1.5px solid var(--red);border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:1.25rem">
+      <p style="font-size:0.88rem;font-weight:700;color:var(--charcoal);margin:0 0 0.2rem">🛒 Your classes are saved</p>
+      <p id="cartBannerText" style="font-size:0.82rem;color:var(--mid);margin:0;line-height:1.5"></p>
+    </div>
+
     <div id="alertBox" style="display:none"></div>
 
     <!-- Social sign-in buttons (shown only if configured on server) -->
@@ -147,16 +153,28 @@
 <script>
 let mode = 'signin';
 
-// Show error from OAuth failure redirect
 const params = new URLSearchParams(window.location.search);
 const oauthErr = params.get('error');
+const returnToPage = params.get('returnTo') || 'my-schedule.html';
+
 if (oauthErr) showAlert(`${oauthErr === 'google' ? 'Google' : 'Facebook'} sign-in failed. Please try again or use email.`, 'error');
+
+// Show cart summary if arriving from schedule checkout
+const cartData = JSON.parse(sessionStorage.getItem('scheduleCart') || 'null');
+if (cartData && cartData.length > 0) {
+  document.getElementById('cartBanner').style.display = 'block';
+  const n = cartData.length;
+  document.getElementById('cartBannerText').textContent =
+    `You have ${n} class${n !== 1 ? 'es' : ''} ready to book — sign in or create an account to continue.`;
+  document.querySelector('.page-hero p').textContent =
+    'Sign in or create your account to complete your booking.';
+}
 
 // Redirect if already signed in
 (async function () {
   try {
     const r = await fetch('/auth/me');
-    if (r.ok) { window.location.href = '/'; }
+    if (r.ok) { window.location.href = returnToPage; }
   } catch (_) {}
 })();
 
@@ -166,7 +184,12 @@ if (oauthErr) showAlert(`${oauthErr === 'google' ? 'Google' : 'Facebook'} sign-i
     const r = await fetch('/auth/config');
     const cfg = await r.json();
     let anyShown = false;
-    if (cfg.googleEnabled)   { document.getElementById('googleBtn').style.display   = 'flex'; anyShown = true; }
+    if (cfg.googleEnabled) {
+      const btn = document.getElementById('googleBtn');
+      btn.style.display = 'flex';
+      btn.href = `/auth/google?returnTo=${encodeURIComponent(returnToPage)}`;
+      anyShown = true;
+    }
     if (cfg.facebookEnabled) { document.getElementById('facebookBtn').style.display = 'flex'; anyShown = true; }
     if (anyShown) {
       document.getElementById('socialSection').style.display  = 'block';
@@ -214,7 +237,7 @@ async function submitAuth(e) {
       });
       const data = await res.json();
       if (res.ok) {
-        window.location.href = '/register.html';
+        window.location.href = returnToPage;
       } else {
         showAlert(data.error || 'Could not create account.', 'error');
         setLoading(false, 'Create Account');
@@ -233,7 +256,7 @@ async function submitAuth(e) {
       });
       const data = await res.json();
       if (res.ok) {
-        window.location.href = '/register.html';
+        window.location.href = returnToPage;
       } else {
         showAlert(data.error || 'Sign in failed.', 'error');
         setLoading(false, 'Sign In');
