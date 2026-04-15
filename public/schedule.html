@@ -547,6 +547,10 @@ function clearCart() {
 async function checkout() {
   if (cartItems.length === 0) return;
   sessionStorage.setItem('scheduleCart', JSON.stringify(cartItems.map(c => c.id)));
+  // Mark this cart as "just checked out" so login.html can distinguish a
+  // legitimate checkout-redirect from stale sessionStorage (e.g. an abandoned
+  // tab where the cart never got booked). The flag is consumed on login load.
+  sessionStorage.setItem('scheduleCartJustCheckedOut', '1');
   try {
     const res = await fetch('/auth/me');
     // Already logged in → go straight to booking

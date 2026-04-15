@@ -928,6 +928,11 @@ function clearCart() {
 async function checkout() {
   if (cartItems.length === 0) return;
   sessionStorage.setItem('scheduleCart', JSON.stringify(cartItems.map(c => c.id)));
+  // Mark this cart as "just checked out" for symmetry with schedule.html. On
+  // this page the user is already logged in so login.html won't see the flag,
+  // but if the session expires between here and register.html it keeps the
+  // banner behavior consistent.
+  sessionStorage.setItem('scheduleCartJustCheckedOut', '1');
   // User is already logged in on this page — go straight to register
   window.location.href = 'register.html';
 }

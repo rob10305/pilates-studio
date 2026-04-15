@@ -187,9 +187,15 @@ function safeReturnTo(raw, fallback) {
 }
 const returnToPage = safeReturnTo(params.get('returnTo'), '/my-schedule.html');
 
-// Show cart summary if arriving from schedule checkout
+// Show cart summary ONLY if the user arrived here directly from a schedule
+// checkout in this session. schedule.html sets `scheduleCartJustCheckedOut`
+// right before redirecting; we consume the flag on every login-page load so
+// stale state from an abandoned tab (cart-never-booked, user navigated
+// elsewhere, etc.) doesn't keep flashing the "your classes are saved" banner.
+const justCheckedOut = sessionStorage.getItem('scheduleCartJustCheckedOut') === '1';
+sessionStorage.removeItem('scheduleCartJustCheckedOut'); // consume — only first view after checkout shows the banner
 const cartData = JSON.parse(sessionStorage.getItem('scheduleCart') || 'null');
-if (cartData && cartData.length > 0) {
+if (justCheckedOut && cartData && cartData.length > 0) {
   document.getElementById('cartBanner').style.display = 'block';
   const n = cartData.length;
   document.getElementById('cartBannerText').textContent =
