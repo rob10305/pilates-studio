@@ -211,9 +211,9 @@
 </nav>
 
 <div class="pricing-hero">
-  <p class="subtitle">Simple &amp; Transparent</p>
-  <h1>Pricing</h1>
-  <p>Choose the option that works best for you. No memberships, no commitments — just great Pilates.</p>
+  <p class="subtitle" data-content-key="pricing.hero.subtitle">Simple &amp; Transparent</p>
+  <h1 data-content-key="pricing.hero.headline">Pricing</h1>
+  <p data-content-key="pricing.hero.body">Choose the option that works best for you. No memberships, no commitments — just great Pilates.</p>
 </div>
 
 <div class="pricing-section">
@@ -262,14 +262,16 @@
 
   </div>
 
-  <p class="pricing-note" style="margin-top:1.5rem;font-size:0.82rem;color:var(--mid);text-align:center">
-    * All classes must be paid in advance to confirm your spot.
-  </p>
+  <div data-content-key="pricing.footer.note">
+    <p class="pricing-note" style="margin-top:1.5rem;font-size:0.82rem;color:var(--mid);text-align:center">
+      * All classes must be paid in advance to confirm your spot.
+    </p>
 
-  <p class="pricing-note">
-    All classes are held at 43 Main Street South – Suite 2B, Campbellville, ON (Inside Glow by Nelly).<br>
-    Questions? Email us at <a href="mailto:amanda@redmaplemovement.ca">amanda@redmaplemovement.ca</a>
-  </p>
+    <p class="pricing-note">
+      All classes are held at 43 Main Street South – Suite 2B, Campbellville, ON (Inside Glow by Nelly).<br>
+      Questions? Email us at <a href="mailto:amanda@redmaplemovement.ca">amanda@redmaplemovement.ca</a>
+    </p>
+  </div>
 </div>
 
 <footer>
@@ -315,5 +317,6 @@ document.getElementById('navToggle').addEventListener('click', function() {
 <!-- Vercel Web Analytics — enable in Vercel dashboard → Analytics tab -->
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="js/analytics.js"></script>
+<script defer src="js/content.js"></script>
 </body>
 </html>

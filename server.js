@@ -8,8 +8,22 @@ const { Strategy: LocalStrategy }    = require('passport-local');
 const { Strategy: GoogleStrategy }   = require('passport-google-oauth20');
 const { Strategy: FacebookStrategy } = require('passport-facebook');
 const bcrypt     = require('bcryptjs');
+const multer     = require('multer');
 const { Resend } = require('resend');
 const crypto     = require('crypto');
+
+// Multer: parse multipart/form-data for Page Editor image uploads.
+// Keep files in memory (small studio, few images) so we can stream them
+// straight into a Postgres bytea column without touching disk — important
+// because Vercel's serverless filesystem is ephemeral.
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max per image
+  fileFilter: (req, file, cb) => {
+    const ok = /^image\/(jpeg|png|webp|gif|svg\+xml)$/.test(file.mimetype);
+    cb(ok ? null : new Error('Only JPG, PNG, WebP, GIF, or SVG images allowed'), ok);
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'pilates2024';
@@ -707,6 +721,78 @@ async function initDB() {
     CREATE INDEX IF NOT EXISTS idx_pw_resets_user ON password_resets(user_id);
   `);
 
+  // Page Editor — admin-editable text/markdown content keyed by a short id.
+  // Pages use <tag data-content-key="home.hero.headline"> and a client-side
+  // loader swaps the default content with whatever's in the DB. If a key
+  // has no row the HTML default shows — graceful fallback.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS page_content (
+      content_key   TEXT PRIMARY KEY,
+      content_value TEXT NOT NULL DEFAULT '',
+      content_type  TEXT NOT NULL DEFAULT 'text',
+      page          TEXT NOT NULL,
+      label         TEXT NOT NULL DEFAULT '',
+      help_text     TEXT NOT NULL DEFAULT '',
+      sort_order    INTEGER NOT NULL DEFAULT 100,
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_page_content_page ON page_content(page, sort_order);
+  `);
+
+  // Admin-uploaded images (hero, portraits, etc.) stored as bytea so the
+  // serverless filesystem's ephemerality isn't an issue. Served via
+  // GET /api/images/:key with a Cache-Control header.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS page_images (
+      image_key   TEXT PRIMARY KEY,
+      mime_type   TEXT NOT NULL,
+      size_bytes  INTEGER NOT NULL,
+      data        BYTEA NOT NULL,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  // Seed the page_content rows with known keys + human-friendly labels.
+  // ON CONFLICT DO NOTHING so subsequent boots don't overwrite admin edits.
+  const seeds = [
+    // HOME
+    ['home', 10,  'home.hero.subtitle',    'text',     'Hero eyebrow',           'The small text above the main headline on the home page (e.g. "Move. Breathe. Transform.")'],
+    ['home', 20,  'home.hero.headline',    'text',     'Hero headline',          'The big main heading on the home page (HTML allowed for line breaks — use a <br> tag if needed)'],
+    ['home', 30,  'home.hero.body',        'markdown', 'Hero body paragraph',    'Intro paragraph under the headline. Markdown allowed.'],
+    ['home', 40,  'home.hero.cta_label',   'text',     'Hero CTA button label',  'The call-to-action button next to the hero (e.g. "Reserve Your Spot")'],
+
+    // ABOUT
+    ['about', 10, 'about.hero.subtitle',   'text',     'Page eyebrow',           'Small text above the About-Me page headline (e.g. "Meet Amanda")'],
+    ['about', 20, 'about.hero.headline',   'text',     'Page headline',          'The main heading on the About-Me page (e.g. "About Me")'],
+    ['about', 30, 'about.bio.heading',     'text',     'Bio heading',            'Heading above the bio ("Hi, I\'m Amanda.")'],
+    ['about', 40, 'about.bio.body',        'markdown', 'Bio / main body',        'Main bio text. Use blank lines between paragraphs. Markdown supported: **bold**, *italic*, lists, links.'],
+    ['about', 50, 'about.portrait.image',  'image',    'Portrait photo',         'Main portrait / studio photo (recommended 600-1200 px wide, JPG or PNG, max 5 MB)'],
+
+    // PRICING
+    ['pricing', 10, 'pricing.hero.subtitle','text',    'Page eyebrow',           'Small text above the Pricing page headline'],
+    ['pricing', 20, 'pricing.hero.headline','text',    'Page headline',          'The main heading on the Pricing page (e.g. "Pricing")'],
+    ['pricing', 30, 'pricing.hero.body',    'text',    'Intro paragraph',        'Short intro paragraph under the Pricing headline'],
+    ['pricing', 40, 'pricing.footer.note',  'markdown','Footer note',            'Note below the pricing cards — payment instructions, location, contact etc. Markdown supported.'],
+
+    // CANCELLATION POLICY
+    ['policy', 10,  'policy.body',          'markdown','Policy body',            'Full cancellation-policy text. Markdown supported (headings with ##, bullets with -).'],
+
+    // WAIVER
+    ['waiver', 10,  'waiver.intro.body',    'markdown','Waiver intro paragraph', 'Friendly intro paragraph shown above the waiver form. The legal liability text remains hard-coded for legal safety.']
+  ];
+  for (const [page, sort, key, type, label, help] of seeds) {
+    await pool.query(`
+      INSERT INTO page_content (content_key, content_value, content_type, page, label, help_text, sort_order)
+      VALUES ($1, '', $2, $3, $4, $5, $6)
+      ON CONFLICT (content_key) DO UPDATE
+        SET label = EXCLUDED.label,
+            help_text = EXCLUDED.help_text,
+            sort_order = EXCLUDED.sort_order,
+            page = EXCLUDED.page,
+            content_type = EXCLUDED.content_type
+    `, [key, type, page, label, help, sort]);
+  }
+
   // Microsoft Clarity API response cache — keyed by bucket (e.g. 'overview',
   // 'geo-device', 'pages-refs') because the Clarity Data Export API is limited
   // to 10 calls per project per day. We refresh each bucket every 8 hours.
@@ -910,6 +996,120 @@ async function createApp() {
       console.error('public-config error:', e);
       res.json({ clarityProjectId: '' });
     }
+  });
+
+  // ===== Page Editor — content API =====
+
+  // Public: all editable content keys/values. Any visitor may fetch this; the
+  // response is a compact map so the client-side loader can apply text/markdown
+  // swaps by data-content-key attribute.
+  app.get('/api/content', async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        'SELECT content_key, content_value, content_type FROM page_content'
+      );
+      const map = {};
+      for (const row of rows) {
+        if (row.content_value) map[row.content_key] = { value: row.content_value, type: row.content_type };
+      }
+      res.set('Cache-Control', 'public, max-age=30');
+      res.json(map);
+    } catch (e) { console.error('content get error:', e); res.json({}); }
+  });
+
+  // Admin: full content rows (with labels + help text) for the Page Editor UI
+  app.get('/api/admin/content', requireAdmin, async (req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        SELECT content_key, content_value, content_type, page, label, help_text, sort_order, updated_at
+        FROM page_content
+        ORDER BY page, sort_order, content_key
+      `);
+      // Also report which image keys have images uploaded so the UI can show previews
+      const { rows: imgRows } = await pool.query('SELECT image_key FROM page_images');
+      const uploadedImages = new Set(imgRows.map(r => r.image_key));
+      res.json({
+        items: rows,
+        uploadedImages: [...uploadedImages]
+      });
+    } catch (e) { console.error('admin content get error:', e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Admin: save one content key's value (text or markdown)
+  app.post('/api/admin/content', requireAdmin, async (req, res) => {
+    const { contentKey, value } = req.body || {};
+    if (!contentKey) return res.status(400).json({ error: 'contentKey required' });
+    try {
+      // Only allow updates to keys that were seeded (whitelist via existence)
+      const { rowCount } = await pool.query(
+        `UPDATE page_content SET content_value = $1, updated_at = NOW() WHERE content_key = $2`,
+        [value || '', contentKey]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: 'Unknown content key' });
+      res.json({ success: true });
+    } catch (e) { console.error('admin content save error:', e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Public: serve an uploaded image (used by <img src="/api/images/about.portrait.image">)
+  app.get('/api/images/:key', async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        'SELECT mime_type, data FROM page_images WHERE image_key = $1',
+        [req.params.key]
+      );
+      if (!rows.length) return res.status(404).send('Not found');
+      res.set('Content-Type', rows[0].mime_type);
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.send(rows[0].data);
+    } catch (e) { console.error('image serve error:', e); res.status(500).send('Error'); }
+  });
+
+  // Admin: upload/replace an image for a specific content key
+  app.post('/api/admin/images/:key', requireAdmin, (req, res, next) => {
+    imageUpload.single('image')(req, res, err => {
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+      next();
+    });
+  }, async (req, res) => {
+    try {
+      // Only allow uploads for keys that are declared as content_type = 'image'
+      const { rows } = await pool.query(
+        `SELECT content_type FROM page_content WHERE content_key = $1`,
+        [req.params.key]
+      );
+      if (!rows.length || rows[0].content_type !== 'image') {
+        return res.status(400).json({ error: 'This key is not declared as an image slot' });
+      }
+      await pool.query(`
+        INSERT INTO page_images (image_key, mime_type, size_bytes, data, updated_at)
+        VALUES ($1, $2, $3, $4, NOW())
+        ON CONFLICT (image_key) DO UPDATE
+          SET mime_type = EXCLUDED.mime_type,
+              size_bytes = EXCLUDED.size_bytes,
+              data = EXCLUDED.data,
+              updated_at = NOW()
+      `, [req.params.key, req.file.mimetype, req.file.size, req.file.buffer]);
+      // Also stamp the content_value so /api/content knows the image exists
+      const imageUrl = `/api/images/${req.params.key}`;
+      await pool.query(
+        `UPDATE page_content SET content_value = $1, updated_at = NOW() WHERE content_key = $2`,
+        [imageUrl, req.params.key]
+      );
+      res.json({ success: true, url: imageUrl + '?t=' + Date.now() });
+    } catch (e) { console.error('image upload error:', e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Admin: remove an uploaded image (reverts to whatever default the HTML provides)
+  app.delete('/api/admin/images/:key', requireAdmin, async (req, res) => {
+    try {
+      await pool.query('DELETE FROM page_images WHERE image_key = $1', [req.params.key]);
+      await pool.query(
+        `UPDATE page_content SET content_value = '', updated_at = NOW() WHERE content_key = $1`,
+        [req.params.key]
+      );
+      res.json({ success: true });
+    } catch (e) { console.error('image delete error:', e); res.status(500).json({ error: 'Server error' }); }
   });
 
   app.get('/auth/me', (req, res) => {

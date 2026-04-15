@@ -416,6 +416,9 @@
       <a href="#analytics" data-view="analytics">
         <span class="si-icon">📈</span><span class="si-label">Analytics</span>
       </a>
+      <a href="#pages"     data-view="pages">
+        <span class="si-icon">📝</span><span class="si-label">Page Editor</span>
+      </a>
       <a href="#settings"  data-view="settings">
         <span class="si-icon">⚙️</span><span class="si-label">Settings</span>
       </a>
@@ -836,6 +839,35 @@
 
     </section>
 
+    <!-- ===== PAGE EDITOR VIEW ===== -->
+    <section class="admin-view" id="view-pages" hidden>
+      <div class="admin-card" style="margin-bottom:1.5rem">
+        <div class="admin-card-header">
+          <h3>📝 Page Editor</h3>
+        </div>
+        <div class="admin-card-body">
+          <p style="color:var(--mid);font-size:0.92rem;line-height:1.5;margin:0 0 0.5rem">
+            Edit text, images, and policy copy on the public site without touching code.
+            Changes are live within seconds of saving. Leave a field blank to fall back to
+            the default text baked into the HTML.
+          </p>
+          <p style="color:var(--mid);font-size:0.82rem;line-height:1.5;margin:0">
+            <strong>Markdown tip:</strong>  <code>**bold**</code>, <code>*italic*</code>,
+            <code>[link text](https://…)</code>, <code>- list item</code> per line,
+            <code>## subheading</code>. Blank lines separate paragraphs.
+          </p>
+        </div>
+      </div>
+
+      <div id="pagesAlert" style="display:none;margin-bottom:1rem"></div>
+      <div id="pageEditorContent">
+        <div class="empty-state" style="padding:3rem 0">
+          <div style="font-size:2rem">⏳</div>
+          <p>Loading editable content…</p>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== SETTINGS VIEW ===== -->
     <section class="admin-view" id="view-settings" hidden>
     <div class="admin-grid">
@@ -1018,13 +1050,14 @@ function renderDashboardInsights(classes, registrations) {
 }
 
 // ===== Sidebar view switching =====
-const VIEWS = ['dashboard', 'classes', 'payments', 'users', 'analytics', 'settings'];
+const VIEWS = ['dashboard', 'classes', 'payments', 'users', 'analytics', 'pages', 'settings'];
 const VIEW_TITLES = {
   dashboard: 'Dashboard',
   classes:   'Classes',
   payments:  'Pending Payments',
   users:     'Users',
   analytics: 'Analytics',
+  pages:     'Page Editor',
   settings:  'Settings'
 };
 
@@ -1047,6 +1080,10 @@ function showView(name) {
   if (name === 'analytics' && !window._analyticsLoaded) {
     loadAnalytics();
     loadClarityInsights(false);
+  }
+  // Lazy-load page editor on first open
+  if (name === 'pages' && !window._pagesLoaded) {
+    loadPageEditor();
   }
 }
 
@@ -1331,6 +1368,197 @@ function renderRowList(rows, emptyMsg) {
         <span style="font-weight:700;color:var(--charcoal)">${r.sessions}</span>
       </li>`).join('')}
   </ul>`;
+}
+
+// ===== Page Editor =====
+window._pagesLoaded = false;
+
+const PAGE_LABELS = {
+  home:     { title: 'Home page',             icon: '🏠', preview: '/index.html' },
+  about:    { title: 'About Me',              icon: '👤', preview: '/about.html' },
+  pricing:  { title: 'Pricing',               icon: '💰', preview: '/pricing.html' },
+  policy:   { title: 'Cancellation Policy',   icon: '📜', preview: '/cancellation-policy.html' },
+  waiver:   { title: 'Waiver',                icon: '✍️', preview: '/waiver.html' }
+};
+
+async function loadPageEditor() {
+  const host = document.getElementById('pageEditorContent');
+  try {
+    const res = await fetch('/api/admin/content');
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    const data = await res.json();
+    window._pagesLoaded = true;
+    renderPageEditor(data, host);
+  } catch (e) {
+    host.innerHTML = `<div class="alert alert-error">Could not load page content: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderPageEditor(data, host) {
+  const byPage = {};
+  for (const item of data.items) {
+    if (!byPage[item.page]) byPage[item.page] = [];
+    byPage[item.page].push(item);
+  }
+  const pageOrder = ['home', 'about', 'pricing', 'policy', 'waiver'];
+  const uploadedImages = new Set(data.uploadedImages || []);
+
+  host.innerHTML = pageOrder
+    .filter(p => byPage[p] && byPage[p].length)
+    .map(p => renderPageSection(p, byPage[p], uploadedImages))
+    .join('');
+}
+
+function renderPageSection(page, items, uploadedImages) {
+  const meta = PAGE_LABELS[page] || { title: page, icon: '📄', preview: '#' };
+  return `
+    <div class="admin-card" style="margin-bottom:1.5rem">
+      <div class="admin-card-header">
+        <h3>${meta.icon} ${escapeHtml(meta.title)}</h3>
+        <a href="${meta.preview}" target="_blank" rel="noopener"
+           class="btn btn-outline btn-sm" style="margin-left:auto">Preview live page ↗</a>
+      </div>
+      <div class="admin-card-body">
+        ${items.map(item => renderContentField(item, uploadedImages)).join('')}
+      </div>
+    </div>`;
+}
+
+function renderContentField(item, uploadedImages) {
+  const inputId = 'pe-' + item.content_key.replace(/\./g, '-');
+  const val = item.content_value || '';
+  const safeVal = escapeHtml(val);
+  const savedAt = item.updated_at
+    ? `<span style="font-size:0.72rem;color:var(--mid);margin-left:0.5rem">· Saved ${new Date(item.updated_at).toLocaleDateString('en-CA', { month:'short', day:'numeric' })}</span>`
+    : '';
+
+  if (item.content_type === 'image') {
+    const hasImage = uploadedImages.has(item.content_key) || val;
+    const imgSrc = hasImage ? `/api/images/${item.content_key}?t=${Date.now()}` : '';
+    return `
+      <div class="pe-field" style="margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border)">
+        <label style="display:block;font-weight:700;font-size:0.95rem;color:var(--charcoal);margin-bottom:0.25rem">${escapeHtml(item.label)}${savedAt}</label>
+        ${item.help_text ? `<p style="font-size:0.82rem;color:var(--mid);margin:0 0 0.75rem;line-height:1.5">${escapeHtml(item.help_text)}</p>` : ''}
+        <div style="display:flex;gap:1rem;align-items:flex-start;flex-wrap:wrap">
+          <div id="${inputId}-preview" style="width:160px;height:120px;border:1px solid var(--border);border-radius:8px;background:#faf7f2 ${hasImage ? `center/cover no-repeat url('${imgSrc}')` : ''};display:flex;align-items:center;justify-content:center;color:var(--mid);font-size:0.8rem">
+            ${hasImage ? '' : 'No image'}
+          </div>
+          <div style="flex:1;min-width:200px">
+            <input type="file" id="${inputId}-file" accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                   style="display:block;font-size:0.85rem;margin-bottom:0.5rem">
+            <div style="display:flex;gap:0.5rem">
+              <button class="btn btn-primary btn-sm" onclick="uploadImage('${item.content_key}', '${inputId}')">Upload</button>
+              ${hasImage ? `<button class="btn btn-outline btn-sm" onclick="deleteImage('${item.content_key}', '${inputId}')">Remove</button>` : ''}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  if (item.content_type === 'markdown') {
+    return `
+      <div class="pe-field" style="margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border)">
+        <label for="${inputId}" style="display:block;font-weight:700;font-size:0.95rem;color:var(--charcoal);margin-bottom:0.25rem">${escapeHtml(item.label)}${savedAt}</label>
+        ${item.help_text ? `<p style="font-size:0.82rem;color:var(--mid);margin:0 0 0.5rem;line-height:1.5">${escapeHtml(item.help_text)}</p>` : ''}
+        <textarea id="${inputId}" rows="8" style="width:100%;box-sizing:border-box;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.9rem;line-height:1.5;padding:0.6rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:#fff;resize:vertical">${safeVal}</textarea>
+        <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+          <button class="btn btn-primary btn-sm" onclick="savePageContent('${item.content_key}', '${inputId}')">Save</button>
+        </div>
+      </div>`;
+  }
+
+  // Plain text field (may be multi-line — e.g. headline)
+  return `
+    <div class="pe-field" style="margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border)">
+      <label for="${inputId}" style="display:block;font-weight:700;font-size:0.95rem;color:var(--charcoal);margin-bottom:0.25rem">${escapeHtml(item.label)}${savedAt}</label>
+      ${item.help_text ? `<p style="font-size:0.82rem;color:var(--mid);margin:0 0 0.5rem;line-height:1.5">${escapeHtml(item.help_text)}</p>` : ''}
+      <textarea id="${inputId}" rows="2" style="width:100%;box-sizing:border-box;font-size:0.95rem;padding:0.55rem 0.75rem;border:1px solid var(--border);border-radius:8px;background:#fff;resize:vertical">${safeVal}</textarea>
+      <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+        <button class="btn btn-primary btn-sm" onclick="savePageContent('${item.content_key}', '${inputId}')">Save</button>
+      </div>
+    </div>`;
+}
+
+async function savePageContent(contentKey, inputId) {
+  const input = document.getElementById(inputId);
+  const alertBox = document.getElementById('pagesAlert');
+  const btn = event && event.target && event.target.closest('button');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const res = await fetch('/api/admin/content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contentKey, value: input.value })
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    alertBox.className = 'alert alert-success';
+    alertBox.textContent = `Saved "${contentKey}". Live site updates within seconds.`;
+    alertBox.style.display = 'block';
+    setTimeout(() => { alertBox.style.display = 'none'; }, 4000);
+  } catch (e) {
+    alertBox.className = 'alert alert-error';
+    alertBox.textContent = 'Could not save: ' + e.message;
+    alertBox.style.display = 'block';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+  }
+}
+
+async function uploadImage(contentKey, inputId) {
+  const fileInput = document.getElementById(inputId + '-file');
+  const preview   = document.getElementById(inputId + '-preview');
+  const alertBox  = document.getElementById('pagesAlert');
+  const btn = event && event.target && event.target.closest('button');
+  if (!fileInput.files || !fileInput.files[0]) {
+    alertBox.className = 'alert alert-error';
+    alertBox.textContent = 'Please choose an image first.';
+    alertBox.style.display = 'block';
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+  try {
+    const form = new FormData();
+    form.append('image', fileInput.files[0]);
+    const res = await fetch(`/api/admin/images/${encodeURIComponent(contentKey)}`, {
+      method: 'POST',
+      body: form
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    preview.style.background = `#faf7f2 center/cover no-repeat url('${data.url}')`;
+    preview.textContent = '';
+    alertBox.className = 'alert alert-success';
+    alertBox.textContent = 'Image uploaded. The live site will pick it up on next page load.';
+    alertBox.style.display = 'block';
+    // Refresh the editor to show the new Remove button
+    loadPageEditor();
+  } catch (e) {
+    alertBox.className = 'alert alert-error';
+    alertBox.textContent = 'Upload failed: ' + e.message;
+    alertBox.style.display = 'block';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Upload'; }
+  }
+}
+
+async function deleteImage(contentKey, inputId) {
+  if (!confirm('Remove this image? The page will revert to its default.')) return;
+  const alertBox = document.getElementById('pagesAlert');
+  try {
+    const res = await fetch(`/api/admin/images/${encodeURIComponent(contentKey)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    alertBox.className = 'alert alert-success';
+    alertBox.textContent = 'Image removed.';
+    alertBox.style.display = 'block';
+    loadPageEditor();
+  } catch (e) {
+    alertBox.className = 'alert alert-error';
+    alertBox.textContent = 'Delete failed: ' + e.message;
+    alertBox.style.display = 'block';
+  }
 }
 
 // Wire sidebar clicks + insight-sublink "→" links

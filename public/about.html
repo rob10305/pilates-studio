@@ -115,35 +115,37 @@
 </nav>
 
 <div class="about-hero">
-  <h1>About Me</h1>
+  <p class="subtitle" data-content-key="about.hero.subtitle" style="display:none"></p>
+  <h1 data-content-key="about.hero.headline">About Me</h1>
 </div>
 
-<!-- Images -->
+<!-- Portrait image — default placeholder is replaced with uploaded image if admin provides one -->
 <div class="about-images" style="margin-top: 3rem;">
-
-  <!-- Replace src with your own image path when ready, e.g. src="images/amanda.jpg" -->
-  <div class="about-img-slot">
+  <div class="about-img-slot" id="aboutImgSlot">
+    <img data-content-key="about.portrait.image" alt="Amanda portrait" style="display:none"
+         onload="this.style.display='block';this.parentElement.querySelectorAll('span').forEach(s=>s.style.display='none')">
     <span class="placeholder-icon">📷</span>
     <span>Photo coming soon</span>
   </div>
-
 </div>
 
 <!-- Bio -->
 <div class="about-bio">
-  <h2>Hi, I'm Amanda.</h2>
+  <h2 data-content-key="about.bio.heading">Hi, I'm Amanda.</h2>
 
-  <p>
-    I'm a certified Pilates instructor and the founder of Red Maple Movement. Trained in both mat and reformer Pilates, I currently offer small-group mat classes focused on intentional, refined movement that feels accessible.
-  </p>
+  <div data-content-key="about.bio.body">
+    <p>
+      I'm a certified Pilates instructor and the founder of Red Maple Movement. Trained in both mat and reformer Pilates, I currently offer small-group mat classes focused on intentional, refined movement that feels accessible.
+    </p>
 
-  <p>
-    I came to Pilates through my own experience and quickly felt the impact of mindful, focused movement — not just in strength and stability, but in how you carry yourself day to day. That perspective continues to shape how I teach.
-  </p>
+    <p>
+      I came to Pilates through my own experience and quickly felt the impact of mindful, focused movement — not just in strength and stability, but in how you carry yourself day to day. That perspective continues to shape how I teach.
+    </p>
 
-  <p>
-    Each class is thoughtfully designed to create a supportive environment where you can move with purpose and build lasting strength. Whether you're new to Pilates, returning after time away, or currently practice, you're welcome here.
-  </p>
+    <p>
+      Each class is thoughtfully designed to create a supportive environment where you can move with purpose and build lasting strength. Whether you're new to Pilates, returning after time away, or currently practice, you're welcome here.
+    </p>
+  </div>
 
   <div class="cta-row">
     <a href="register.html" class="btn" style="background:#FAF7F2;color:#820000;border:2px solid #820000">Reserve Your Spot</a>
@@ -189,5 +191,6 @@ document.getElementById('navToggle').addEventListener('click', function () {
 <!-- Vercel Web Analytics — enable in Vercel dashboard → Analytics tab -->
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="js/analytics.js"></script>
+<script defer src="js/content.js"></script>
 </body>
 </html>
