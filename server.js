@@ -152,7 +152,6 @@ async function sendConfirmationEmail({ to, firstName, lastName, cls, registratio
         : `Your spot is reserved for the next hour. Please complete payment to confirm your spot in class.`,
       detailRows: [
         ['Name', `${firstName} ${lastName}`],
-        ['Email', to],
         ['Class', cls.title],
         ['Date', formatClassDate(cls.date)],
         ['Time', formatClassTime(cls.time)],
@@ -222,7 +221,6 @@ async function sendBatchDropInConfirmation({ to, firstName, lastName, classes })
       subtitle: `Your ${n} spots are reserved. Please complete payment to confirm them.`,
       detailRows: [
         ['Name',  `${firstName} ${lastName}`],
-        ['Email', to],
         ['Classes booked', `${n} class${n === 1 ? '' : 'es'}`]
       ],
       body: `
@@ -255,7 +253,6 @@ async function sendWaiverConfirmationEmail({ to, firstName, waiverId, signedAt }
       detailRows: [
         ['Signed By', firstName],
         ['Date', signedDate],
-        ['Email', to],
       ],
       body: `<p style="font-size:13px;color:#6b6b6b;margin:0">You can view and download a copy of your signed waiver at any time using the button below.</p>
              <p style="font-size:12px;color:#b0b0b0;margin:8px 0 0">Keep this email — the link provides permanent access to your waiver copy.</p>`,
@@ -2250,10 +2247,17 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
       const { rows } = await pool.query(`
         SELECT u.id, u.email, u.first_name, u.last_name, u.is_admin, u.created_at,
                w.id AS waiver_id, w.signed_at AS waiver_signed_at,
-               COALESCE(uc.balance, 0) AS credit_balance
+               COALESCE(uc.balance, 0) AS credit_balance,
+               COALESCE(w.phone, rp.phone, '') AS phone
         FROM users u
         LEFT JOIN waivers w ON w.user_id = u.id OR LOWER(w.email) = LOWER(u.email)
         LEFT JOIN user_credits uc ON uc.user_id = u.id
+        LEFT JOIN LATERAL (
+          SELECT phone FROM registrations
+          WHERE (user_id = u.id OR LOWER(email) = LOWER(u.email))
+            AND phone IS NOT NULL AND phone != ''
+          ORDER BY "registeredAt" DESC LIMIT 1
+        ) rp ON true
         ORDER BY u.is_admin DESC, u.created_at ASC
       `);
       res.json(rows);

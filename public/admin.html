@@ -2007,6 +2007,7 @@ function renderAllUsers(users) {
           <th style="padding:8px 12px;width:16px"></th>
           <th style="padding:8px 12px">Name</th>
           <th style="padding:8px 12px">Email</th>
+          <th style="padding:8px 12px">Phone</th>
           <th style="padding:8px 12px">Admin</th>
           <th style="padding:8px 12px">Credits</th>
           <th style="padding:8px 12px">Waiver</th>
@@ -2022,6 +2023,9 @@ function renderAllUsers(users) {
             <td style="padding:10px 6px 10px 12px"><span class="user-chevron">▶</span></td>
             <td style="padding:10px 12px;font-weight:600">${u.first_name} ${u.last_name}</td>
             <td style="padding:10px 12px">${u.email}</td>
+            <td style="padding:10px 12px">${u.phone
+              ? `<span id="phone-mask-${u.id}" style="color:var(--mid);font-size:0.82rem;cursor:pointer" onclick="event.stopPropagation();this.textContent='${u.phone.replace(/'/g, "\\'")}';this.style.cursor='default'" title="Click to reveal">•••••${u.phone.slice(-4)}</span>`
+              : '<span style="color:#ccc">—</span>'}</td>
             <td style="padding:10px 12px;text-align:center">${u.is_admin ? '<span style="color:#2e7d32;font-weight:700">✓</span>' : '<span style="color:#ccc">—</span>'}</td>
             <td style="padding:10px 12px">
               <div style="display:flex;align-items:center;gap:0.4rem">
@@ -2047,7 +2051,7 @@ function renderAllUsers(users) {
             </td>
           </tr>
           <tr class="user-detail-row" id="user-detail-${u.id}" style="display:none">
-            <td colspan="10">
+            <td colspan="11">
               <div class="user-detail-inner" id="user-detail-inner-${u.id}">
                 <p class="detail-loading">Loading booking history…</p>
               </div>
