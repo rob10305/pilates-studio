@@ -705,16 +705,8 @@ footer .copyright { font-size: 0.8rem; color: rgba(255,255,255,0.4); border-top:
     border: none;
     background: transparent;
   }
-  /* Hide all nav items except Home, Schedule, My Account */
+  /* Hide all nav items on mobile — bottom nav handles navigation */
   .nav-links li { display: none !important; }
-  .nav-links li:nth-child(1),
-  .nav-links li:nth-child(3) {
-    display: block !important;
-  }
-  /* My Schedule shown by JS when logged in — just ensure it's not hidden by our rule */
-  .nav-links li#myScheduleNav[style*="block"] {
-    display: block !important;
-  }
   .nav-links a {
     display: block;
     padding: 0.6rem 1rem;
