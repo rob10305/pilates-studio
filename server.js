@@ -794,7 +794,7 @@ async function createApp() {
   });
 
   app.post('/api/register', async (req, res) => {
-    const { classId, firstName, lastName, email, phone, packageType } = req.body;
+    const { classId, firstName, lastName, email, phone, packageType, password } = req.body;
     if (!classId || !firstName || !lastName || !email)
       return res.status(400).json({ error: 'Missing required fields' });
     try {
@@ -811,7 +811,43 @@ async function createApp() {
       if (dupRows.length > 0) return res.status(409).json({ error: 'You are already registered for this class' });
 
       const registrationId = Date.now().toString();
-      const userId = req.isAuthenticated() ? req.user.id : null;
+      let userId = req.isAuthenticated() ? req.user.id : null;
+      let accountCreated = false;
+
+      // ── Optional account creation during booking ───────────────
+      if (password && !req.isAuthenticated() && password.length >= 8) {
+        try {
+          const { rows: existing } = await pool.query(
+            'SELECT id, password_hash FROM users WHERE LOWER(email) = LOWER($1)', [email]
+          );
+          const hash = await bcrypt.hash(password, 12);
+          if (existing.length > 0) {
+            // User record exists (e.g. Google login) — add password if not already set
+            userId = existing[0].id;
+            if (!existing[0].password_hash) {
+              await pool.query(
+                'UPDATE users SET password_hash=$1, first_name=$2, last_name=$3 WHERE id=$4',
+                [hash, firstName.trim(), lastName.trim(), userId]
+              );
+              accountCreated = true;
+            }
+            await new Promise((resolve, reject) =>
+              req.login(existing[0], err => err ? reject(err) : resolve())
+            ).catch(() => {});
+          } else {
+            // Brand new user — create account and log in
+            const { rows: newUser } = await pool.query(
+              'INSERT INTO users (email, password_hash, first_name, last_name) VALUES ($1,$2,$3,$4) RETURNING *',
+              [email.toLowerCase(), hash, firstName.trim(), lastName.trim()]
+            );
+            userId = newUser[0].id;
+            accountCreated = true;
+            await new Promise((resolve, reject) =>
+              req.login(newUser[0], err => err ? reject(err) : resolve())
+            ).catch(() => {});
+          }
+        } catch (e) { console.error('Account creation error during booking:', e); }
+      }
 
       // ── Credit booking: deduct 1 credit, auto-confirm ──────────
       if (packageType === 'credit') {
@@ -830,7 +866,7 @@ async function createApp() {
           [registrationId, classId, firstName, lastName, email, phone || '', new Date().toISOString(), userId]
         );
         const creditsRemaining = balance - 1;
-        res.status(201).json({ success: true, registrationId, packageType: 'credit', creditsRemaining });
+        res.status(201).json({ success: true, registrationId, packageType: 'credit', creditsRemaining, accountCreated });
         sendCreditBookingEmail({ to: email, firstName, cls, creditsRemaining }).catch(console.error);
         return;
       }
@@ -842,7 +878,7 @@ async function createApp() {
          VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9)`,
         [registrationId, classId, firstName, lastName, email, phone || '', new Date().toISOString(), pkgType, userId]
       );
-      res.status(201).json({ success: true, registrationId, packageType: pkgType });
+      res.status(201).json({ success: true, registrationId, packageType: pkgType, accountCreated });
       sendConfirmationEmail({ to: email, firstName, lastName, cls, registrationId }).catch(e => console.error('Confirmation email error:', e.message));
       getSetting('booking_notify_email').then(notifyEmail => {
         if (notifyEmail) sendNewBookingNotification({ notifyEmail, registrant: { firstName, lastName, email, phone }, cls }).catch(e => console.error('Notify email error:', e.message));

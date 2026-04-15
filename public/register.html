@@ -150,6 +150,22 @@
         </div>
       </div>
 
+      <!-- Account creation (hidden once logged in) -->
+      <div id="accountSection">
+        <div style="background:var(--cream);border-radius:var(--radius);border:1px solid var(--border);padding:1.25rem;margin-bottom:1.25rem">
+          <p style="font-size:0.9rem;font-weight:700;color:var(--charcoal);margin:0 0 0.2rem">🔐 Create your account <span style="font-size:0.78rem;font-weight:400;color:var(--mid)">(optional)</span></p>
+          <p style="font-size:0.82rem;color:var(--mid);margin:0 0 0.85rem;line-height:1.5">Set a password so you can log in and track your bookings anytime.</p>
+          <div class="form-group" style="margin-bottom:0.75rem">
+            <label for="newPassword" style="font-size:0.85rem">Password</label>
+            <input type="password" id="newPassword" placeholder="Min. 8 characters" autocomplete="new-password" oninput="handlePasswordInput()">
+          </div>
+          <div class="form-group" id="confirmPwGroup" style="display:none;margin-bottom:0">
+            <label for="newPasswordConfirm" style="font-size:0.85rem">Confirm Password</label>
+            <input type="password" id="newPasswordConfirm" placeholder="Repeat your password" autocomplete="new-password">
+          </div>
+        </div>
+      </div>
+
       <p style="font-size:0.88rem;color:var(--mid);margin-bottom:1rem">Payment via Interac e-Transfer is required upon booking. See our <a href="cancellation-policy.html" style="color:var(--red)">Cancellation Policy</a>.</p>
 
       <button type="submit" class="btn btn-primary form-submit" id="submitBtn">
@@ -371,6 +387,11 @@ document.getElementById('classSelect').addEventListener('change', function() {
   updateBanner(this.value);
 });
 
+function handlePasswordInput() {
+  const pw = document.getElementById('newPassword').value;
+  document.getElementById('confirmPwGroup').style.display = pw.length > 0 ? 'block' : 'none';
+}
+
 async function submitForm(e) {
   e.preventDefault();
   const alertBox = document.getElementById('alertBox');
@@ -474,14 +495,38 @@ async function doSubmit(packageType) {
   const alertBox = document.getElementById('alertBox');
   alertBox.style.display = 'none';
 
+  // ── Password validation ─────────────────────────────────────
+  const pwInput   = document.getElementById('newPassword');
+  const pwConfirm = document.getElementById('newPasswordConfirm');
+  const password  = pwInput  ? pwInput.value.trim()   : '';
+  const pwConfVal = pwConfirm ? pwConfirm.value.trim() : '';
+
+  if (password) {
+    if (password.length < 8) {
+      alertBox.className = 'alert alert-error';
+      alertBox.textContent = 'Password must be at least 8 characters.';
+      alertBox.style.display = 'block';
+      return;
+    }
+    if (password !== pwConfVal) {
+      alertBox.className = 'alert alert-error';
+      alertBox.textContent = 'Passwords do not match. Please try again.';
+      alertBox.style.display = 'block';
+      return;
+    }
+  }
+
+  const extraFields = password ? { password } : {};
+
   if (cartClasses.length > 0) {
     // Cart mode — submit each class in sequence
     let successCount = 0;
     let lastCreditsRemaining;
     let lastError = '';
+    let accountCreated = false;
 
     for (const cls of cartClasses) {
-      const body = { ...window._pendingBookingBody, classId: cls.id, packageType };
+      const body = { ...window._pendingBookingBody, classId: cls.id, packageType, ...extraFields };
       try {
         const res = await fetch('/api/register', {
           method: 'POST',
@@ -492,6 +537,7 @@ async function doSubmit(packageType) {
         if (res.ok) {
           successCount++;
           lastCreditsRemaining = data.creditsRemaining;
+          if (data.accountCreated) accountCreated = true;
         } else {
           lastError = data.error || 'Something went wrong.';
         }
@@ -502,7 +548,7 @@ async function doSubmit(packageType) {
 
     if (successCount === cartClasses.length) {
       sessionStorage.removeItem('scheduleCart');
-      showCartSuccess(window._pendingBookingBody.firstName, cartClasses, packageType, lastCreditsRemaining);
+      showCartSuccess(window._pendingBookingBody.firstName, cartClasses, packageType, lastCreditsRemaining, accountCreated);
     } else {
       alertBox.className = 'alert alert-error';
       alertBox.textContent = lastError || 'Some classes could not be booked. Please try again.';
@@ -510,7 +556,7 @@ async function doSubmit(packageType) {
     }
   } else {
     // Single class mode
-    const body = { ...window._pendingBookingBody, packageType };
+    const body = { ...window._pendingBookingBody, packageType, ...extraFields };
     try {
       const res = await fetch('/api/register', {
         method: 'POST',
@@ -520,7 +566,7 @@ async function doSubmit(packageType) {
       const data = await res.json();
 
       if (res.ok) {
-        showSuccess(body.firstName, body.lastName, body.classId, packageType, data.creditsRemaining);
+        showSuccess(body.firstName, body.lastName, body.classId, packageType, data.creditsRemaining, data.accountCreated);
       } else {
         alertBox.className = 'alert alert-error';
         alertBox.textContent = data.error || 'Something went wrong. Please try again.';
@@ -534,7 +580,7 @@ async function doSubmit(packageType) {
   }
 }
 
-function showCartSuccess(firstName, classes, packageType, creditsRemaining) {
+function showCartSuccess(firstName, classes, packageType, creditsRemaining, accountCreated) {
   const card = document.getElementById('formCard');
   const n = classes.length;
   const sorted = [...classes].sort((a, b) =>
@@ -587,6 +633,7 @@ function showCartSuccess(firstName, classes, packageType, creditsRemaining) {
         `).join('')}
       </div>
       ${paymentBlock}
+      ${accountCreated ? `<div style="background:#e8f5e9;border:1.5px solid #a8d5a8;border-radius:10px;padding:0.9rem 1.1rem;margin-bottom:1.25rem;font-size:0.88rem;color:#2e7d32;font-weight:600;text-align:left">✅ Account created — you're now logged in and can track your bookings.</div>` : ''}
       <p style="font-size:0.8rem;color:var(--light);margin-bottom:2rem">Cancellations made more than 24 hours before class start are fully refundable. <a href="cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
       <div style="display:flex;flex-direction:column;gap:0.75rem">
         <a href="my-schedule.html" class="btn btn-primary" style="width:100%;text-align:center">View My Schedule</a>
@@ -595,7 +642,7 @@ function showCartSuccess(firstName, classes, packageType, creditsRemaining) {
     </div>`;
 }
 
-function showSuccess(firstName, lastName, classId, packageType, creditsRemaining) {
+function showSuccess(firstName, lastName, classId, packageType, creditsRemaining, accountCreated) {
   const cls = allClasses.find(c => c.id === classId);
   const card = document.getElementById('formCard');
 
@@ -635,6 +682,7 @@ function showSuccess(firstName, lastName, classId, packageType, creditsRemaining
           : `Your spot in <strong>${cls ? cls.title : 'the class'}</strong> is being held while payment is completed.`}
       </p>
       ${paymentBlock}
+      ${accountCreated ? `<div style="background:#e8f5e9;border:1.5px solid #a8d5a8;border-radius:10px;padding:0.9rem 1.1rem;margin-bottom:1.25rem;font-size:0.88rem;color:#2e7d32;font-weight:600;text-align:left">✅ Account created — you're now logged in and can track your bookings.</div>` : ''}
       <p style="font-size:0.8rem;color:var(--light);margin-bottom:2rem">Cancellations made more than 24 hours before class start are fully refundable. <a href="cancellation-policy.html" style="color:#820000">Cancellation Policy</a></p>
       <div style="display:flex;flex-direction:column;gap:0.75rem">
         <a href="my-schedule.html" class="btn btn-primary" style="width:100%;text-align:center">View My Schedule</a>
@@ -659,7 +707,8 @@ loadClasses();
       if (user.firstName) document.getElementById('firstName').value = user.firstName;
       if (user.lastName)  document.getElementById('lastName').value  = user.lastName;
       if (user.email)     document.getElementById('email').value     = user.email;
-      // Already signed in — no need to show Google button
+      // Already signed in — hide account creation section
+      document.getElementById('accountSection').style.display = 'none';
       return;
     }
 
