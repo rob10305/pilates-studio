@@ -95,6 +95,11 @@
       margin: 0 auto;
       min-height: calc(100vh - 240px);
     }
+    /* Backdrop — hidden by default on desktop; mobile media query promotes
+       it to fixed + block when the sidebar is open. MUST be display:none at
+       base otherwise the empty div steals a grid cell and pushes .admin-main
+       to wrap to a new row at 240px wide. */
+    .admin-sidebar-backdrop { display: none; }
     .admin-sidebar {
       background: var(--cream);
       border-right: 1px solid var(--border);
