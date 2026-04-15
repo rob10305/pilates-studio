@@ -1,0 +1,39 @@
+# Red Maple Movement — https://redmaplemovement.ca
+
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /login.html
+Disallow: /register.html
+Disallow: /my-schedule.html
+Disallow: /forgot-password.html
+Disallow: /reset-password.html
+Disallow: /api/
+Disallow: /auth/
+
+# Permit major AI search crawlers that respect robots.txt
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://redmaplemovement.ca/sitemap.xml
