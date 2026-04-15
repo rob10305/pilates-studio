@@ -170,8 +170,6 @@ const params = new URLSearchParams(window.location.search);
 const oauthErr = params.get('error');
 const returnToPage = params.get('returnTo') || 'my-schedule.html';
 
-if (oauthErr) showAlert(`${oauthErr === 'google' ? 'Google' : 'Facebook'} sign-in failed. Please try again or use email.`, 'error');
-
 // Show cart summary if arriving from schedule checkout
 const cartData = JSON.parse(sessionStorage.getItem('scheduleCart') || 'null');
 if (cartData && cartData.length > 0) {
@@ -183,12 +181,21 @@ if (cartData && cartData.length > 0) {
     'Sign in or create your account to complete your booking.';
 }
 
-// Redirect if already signed in
+// Check auth state FIRST. If the user is actually signed in, silently
+// redirect — never flash an error alert. Only show the error alert if the
+// session check confirms they're genuinely not logged in. Fixes the
+// "Google sign-in failed" flash that appears between OAuth success and
+// the redirect to the destination page when the session hadn't finished
+// persisting yet.
 (async function () {
   try {
-    const r = await fetch('/auth/me');
-    if (r.ok) { window.location.href = returnToPage; }
+    const r = await fetch('/auth/me', { cache: 'no-store' });
+    if (r.ok) { window.location.href = returnToPage; return; }
   } catch (_) {}
+  // Not signed in — NOW it's safe to surface any carried-over error
+  if (oauthErr) {
+    showAlert(`${oauthErr === 'google' ? 'Google' : 'Facebook'} sign-in failed. Please try again or use email.`, 'error');
+  }
 })();
 
 // Load which OAuth providers are available

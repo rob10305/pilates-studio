@@ -1433,19 +1433,39 @@ async function createApp() {
         if (loginErr) { console.error('Google login error:', loginErr.message || loginErr); return res.redirect('/login.html?error=google'); }
         const returnTo = req.session.authReturnTo || '/';
         delete req.session.authReturnTo;
-        return res.redirect(returnTo.startsWith('http') ? returnTo : '/' + returnTo);
+        // Explicitly save the session before redirecting. Without this,
+        // express-session writes the row asynchronously and the browser can
+        // hit the destination page (calling /auth/me) before the session
+        // exists in Postgres — producing a momentary "not signed in" flash.
+        req.session.save(saveErr => {
+          if (saveErr) console.error('Google session save error:', saveErr.message);
+          return res.redirect(returnTo.startsWith('http') ? returnTo : '/' + returnTo);
+        });
       });
     })(req, res, next);
   });
 
   app.get('/auth/facebook', (req, res, next) => {
     if (!process.env.FACEBOOK_APP_ID) return res.redirect('/login.html?error=facebook-not-configured');
+    if (req.query.returnTo) req.session.authReturnTo = req.query.returnTo;
     passport.authenticate('facebook', { scope: ['email'] })(req, res, next);
   });
   app.get('/auth/facebook/callback', (req, res, next) => {
     if (!process.env.FACEBOOK_APP_ID) return res.redirect('/login.html?error=facebook-not-configured');
-    passport.authenticate('facebook', { failureRedirect: '/login.html?error=facebook' })(req, res, next);
-  }, (req, res) => res.redirect('/'));
+    passport.authenticate('facebook', (err, user) => {
+      if (err)   { console.error('Facebook auth error:', err.message || err); return res.redirect('/login.html?error=facebook'); }
+      if (!user) { console.error('Facebook auth: no user returned'); return res.redirect('/login.html?error=facebook'); }
+      req.login(user, (loginErr) => {
+        if (loginErr) { console.error('Facebook login error:', loginErr.message || loginErr); return res.redirect('/login.html?error=facebook'); }
+        const returnTo = req.session.authReturnTo || '/';
+        delete req.session.authReturnTo;
+        req.session.save(saveErr => {
+          if (saveErr) console.error('Facebook session save error:', saveErr.message);
+          return res.redirect(returnTo.startsWith('http') ? returnTo : '/' + returnTo);
+        });
+      });
+    })(req, res, next);
+  });
 
   // --- Admin middleware ---
   function requireAdmin(req, res, next) {
