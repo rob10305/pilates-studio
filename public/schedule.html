@@ -74,16 +74,16 @@
 <div style="max-width:1200px;margin:0 auto;padding:0 5% 3rem">
   <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">
     <iframe
-      src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2894.5!2d-79.9435!3d43.4715!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x882b60f1c2b4c7b7%3A0x0!2s9267+Guelph+Line%2C+Campbellville%2C+ON+L0P+1B0!5e0!3m2!1sen!2sca!4v1"
+      src="https://maps.google.com/maps?q=43+Main+Street+South,+Campbellville,+ON+L0P+1B0&output=embed"
       width="100%" height="300" style="border:0;display:block" allowfullscreen="" loading="lazy"
       referrerpolicy="no-referrer-when-downgrade"></iframe>
     <div style="padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem">
       <div style="font-size:1.75rem;flex-shrink:0">📍</div>
       <div>
-        <p style="font-weight:700;color:var(--charcoal);margin-bottom:0.15rem">Nassagaweya Tennis Centre &amp; Community Hall</p>
-        <p style="font-size:0.9rem;color:var(--mid)">9267 Guelph Line, Campbellville, ON L0P 1B0</p>
+        <p style="font-weight:700;color:var(--charcoal);margin-bottom:0.15rem">43 Main Street South – Suite 2B (Inside Glow by Nelly)</p>
+        <p style="font-size:0.9rem;color:var(--mid)">Campbellville, ON L0P 1B0</p>
       </div>
-      <a href="https://www.google.com/maps/search/?api=1&query=9267+Guelph+Line+Campbellville+ON+L0P+1B0" target="_blank" rel="noopener"
+      <a href="https://www.google.com/maps/search/?api=1&query=43+Main+Street+South+Campbellville+ON+L0P+1B0" target="_blank" rel="noopener"
          class="btn btn-outline btn-sm" style="margin-left:auto;white-space:nowrap">Get Directions</a>
     </div>
   </div>
@@ -283,7 +283,7 @@ function showClassesForDate(dateKey) {
           <span>👤 ${cls.instructor}</span>
         </div>
         ${cls.description && cls.description !== 'Private Booking' ? `<p style="font-size:0.8rem;color:var(--mid);margin-top:0.5rem">${cls.description}</p>` : ''}
-        <p style="font-size:0.8rem;color:var(--mid);margin-top:0.5rem">📍 ${cls.description === 'Private Booking' ? 'Private Booking' : 'Nassagaweya Tennis Centre &amp; Community Hall, 9267 Guelph Line, Campbellville, ON L0P 1B0'}</p>
+        <p style="font-size:0.8rem;color:var(--mid);margin-top:0.5rem">📍 ${cls.description === 'Private Booking' ? 'Private Booking' : '43 Main Street South – Suite 2B, Campbellville, ON L0P 1B0 (Inside Glow by Nelly)'}</p>
         ${!isFull ? `<div style="margin-top:0.75rem"><button class="btn btn-sage btn-sm" onclick="event.stopPropagation();bookClass('${cls.id}')">Book Now</button></div>` : '<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--light)">Class is fully booked</div>'}
       </div>`;
   }).join('');
