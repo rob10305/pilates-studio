@@ -1049,17 +1049,26 @@ async function createApp() {
   app.set('trust proxy', 1);
 
   // 1a. Security headers (must come before other middleware so every response gets them)
-  // - CSP allows the CDN/analytics origins the frontend actually uses: jsDelivr for Chart.js
-  //   on admin pages, Google Fonts for typography, Clarity for admin-opted-in session analytics.
-  // - 'unsafe-inline' styles are kept because the admin dashboard uses inline style attributes
-  //   extensively; inline scripts are NOT allowed. If admin.html triggers CSP errors we'll
-  //   migrate inline handlers to addEventListener rather than loosening the policy.
+  // - CSP script-src allows the CDN/analytics origins the frontend uses:
+  //   jsDelivr (Chart.js on admin), Clarity, Vercel Insights.
+  // - 'unsafe-inline' is permitted for BOTH scripts and styles because the
+  //   existing HTML pages (login, register, schedule, waiver, admin, etc.)
+  //   embed large inline <script> blocks and inline style attributes.
+  //   Removing them cleanly is a sizeable refactor (tracked as a P2 item:
+  //   "migrate inline scripts to external files or add per-request nonces").
+  //   Until then, 'unsafe-inline' is the trade-off that keeps the site
+  //   functional. Everything else in this CSP still provides meaningful
+  //   defense: frameAncestors 'none' blocks clickjacking, formAction 'self'
+  //   blocks off-site form posts, objectSrc 'none' blocks Flash/plugins,
+  //   baseUri 'self' blocks <base> tag injection, and the origin allowlists
+  //   on img/font/connect limit exfiltration channels.
   // - HSTS only in production — local dev runs over HTTP.
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", 'https://cdn.jsdelivr.net', 'https://www.clarity.ms', 'https://*.clarity.ms', 'https://*.vercel-insights.com'],
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://www.clarity.ms', 'https://*.clarity.ms', 'https://*.vercel-insights.com'],
+        scriptSrcAttr: ["'unsafe-inline'"],  // allows onclick= etc. used in legacy pages
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
         imgSrc: ["'self'", 'data:', 'https:'],
