@@ -703,6 +703,76 @@
         </div>
       </div>
 
+      <!-- Website Visitors (Clarity-pulled metrics) -->
+      <div class="admin-card" style="margin-bottom:1.5rem">
+        <div class="admin-card-header">
+          <h3>🌍 Website Visitors &amp; Locations</h3>
+          <span id="clarityFetchedAt" style="font-size:0.78rem;color:var(--mid);margin-left:auto;margin-right:0.75rem"></span>
+          <button id="clarityRefreshBtn" class="btn btn-outline btn-sm"
+                  onclick="loadClarityInsights(true)">Refresh</button>
+        </div>
+        <div class="admin-card-body">
+          <div id="clarityLoading" style="padding:2rem;text-align:center;color:var(--mid)">
+            Loading visitor metrics from Microsoft Clarity…
+          </div>
+          <div id="clarityNotConfigured" style="display:none;background:#fff8e1;border:1px solid #f9a825;color:#8d6e00;border-radius:8px;padding:1rem;font-size:0.9rem;line-height:1.5">
+            <strong>Clarity API token not configured.</strong> To populate this card,
+            go to <a href="#settings" data-view="settings" style="color:var(--red)">Settings → Microsoft Clarity</a>
+            and paste your Data Export API token. Generate one at
+            <a href="https://clarity.microsoft.com" target="_blank" rel="noopener" style="color:var(--red)">clarity.microsoft.com</a>
+            → your project → <em>Settings → Data Export → API Token</em>.
+          </div>
+          <div id="clarityError" style="display:none;background:#fce4ec;border:1px solid #c62828;color:#c62828;border-radius:8px;padding:1rem;font-size:0.9rem"></div>
+          <div id="clarityContent" style="display:none">
+
+            <div class="kpi-strip">
+              <div class="kpi">
+                <div class="kpi-label">Sessions (last 3 days)</div>
+                <div class="kpi-value" id="clarityKpiSessions">—</div>
+                <div class="kpi-sub" id="clarityKpiBots"></div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">Unique Users</div>
+                <div class="kpi-value" id="clarityKpiUsers">—</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">Page Views</div>
+                <div class="kpi-value" id="clarityKpiPageviews">—</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">Avg Engagement</div>
+                <div class="kpi-value" id="clarityKpiEngagement">—</div>
+                <div class="kpi-sub" id="clarityKpiScroll"></div>
+              </div>
+            </div>
+
+            <div class="chart-grid">
+              <div class="chart-cell">
+                <h4>Top Countries</h4>
+                <div class="chart-box"><canvas id="chartClarityCountries"></canvas></div>
+              </div>
+              <div class="chart-cell">
+                <h4>Device Breakdown</h4>
+                <div class="chart-box"><canvas id="chartClarityDevices"></canvas></div>
+              </div>
+              <div class="chart-cell">
+                <h4>Top Pages</h4>
+                <div id="clarityTopPages" style="max-height:260px;overflow-y:auto">
+                  <div class="empty-mini">No data yet.</div>
+                </div>
+              </div>
+              <div class="chart-cell">
+                <h4>Top Referrers</h4>
+                <div id="clarityTopReferrers" style="max-height:260px;overflow-y:auto">
+                  <div class="empty-mini">No data yet.</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
       <!-- Business metrics -->
       <div class="admin-card" style="margin-bottom:1.5rem">
         <div class="admin-card-header">
@@ -797,9 +867,24 @@
             </p>
             <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap">
               <div class="form-group" style="flex:1;min-width:260px;margin-bottom:0">
+                <label for="clarityProjectId" style="font-size:0.82rem">Project ID</label>
                 <input type="text" id="clarityProjectId" placeholder="e.g. abcd1234ef" autocomplete="off" spellcheck="false">
               </div>
               <button class="btn btn-primary" onclick="saveClarityId()" style="white-space:nowrap">Save</button>
+            </div>
+
+            <p style="font-size:0.82rem;color:var(--mid);margin:1rem 0 0.4rem">
+              <strong>Optional: Data Export API Token</strong> — paste a token here to pull Clarity
+              metrics (sessions, countries, devices, top pages) into the Analytics view.
+              Generate one at Clarity → your project → <em>Settings → Data Export → API Token → Generate</em>.
+              Rate-limited to 10 calls/day by Microsoft; the admin refreshes every 8 hours
+              (3 buckets × ~3 refreshes/day = 9 calls, within the limit).
+            </p>
+            <div style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap">
+              <div class="form-group" style="flex:1;min-width:260px;margin-bottom:0">
+                <input type="password" id="clarityApiToken" placeholder="Paste API token (stored server-side)" autocomplete="off" spellcheck="false">
+              </div>
+              <button class="btn btn-primary" onclick="saveClarityToken()" style="white-space:nowrap">Save</button>
             </div>
           </div>
 
@@ -961,6 +1046,7 @@ function showView(name) {
   // Lazy-load analytics the first time the user opens it
   if (name === 'analytics' && !window._analyticsLoaded) {
     loadAnalytics();
+    loadClarityInsights(false);
   }
 }
 
@@ -1112,6 +1198,139 @@ function formatMonth(yyyymm) {
   const [y, m] = yyyymm.split('-');
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return `${months[parseInt(m) - 1]} ${y.slice(2)}`;
+}
+
+// ===== Microsoft Clarity visitor metrics (admin Analytics view) =====
+window._clarityCharts = {};
+
+async function loadClarityInsights(forceRefresh) {
+  const loadingEl  = document.getElementById('clarityLoading');
+  const notCfgEl   = document.getElementById('clarityNotConfigured');
+  const errorEl    = document.getElementById('clarityError');
+  const contentEl  = document.getElementById('clarityContent');
+  const refreshBtn = document.getElementById('clarityRefreshBtn');
+  if (!contentEl) return;
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (notCfgEl)  notCfgEl.style.display  = 'none';
+  if (errorEl)   errorEl.style.display   = 'none';
+  if (contentEl) contentEl.style.display = 'none';
+  if (refreshBtn) refreshBtn.disabled = true;
+
+  try {
+    const url = '/api/admin/clarity-insights' + (forceRefresh ? '?refresh=1' : '');
+    const res = await fetch(url);
+    if (res.status === 400) {
+      const data = await res.json().catch(() => ({}));
+      if (data.error && /not configured/i.test(data.error)) {
+        loadingEl.style.display = 'none';
+        notCfgEl.style.display  = 'block';
+        return;
+      }
+      throw new Error(data.error || 'Bad request');
+    }
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+
+    const payload = await res.json();
+    if (typeof Chart === 'undefined') {
+      await new Promise(r => {
+        const tick = () => (typeof Chart !== 'undefined' ? r() : setTimeout(tick, 50));
+        tick();
+      });
+    }
+    renderClarityInsights(payload);
+    loadingEl.style.display = 'none';
+    contentEl.style.display = 'block';
+  } catch (e) {
+    console.error('Clarity insights error:', e);
+    loadingEl.style.display = 'none';
+    errorEl.textContent = 'Could not load visitor metrics: ' + (e.message || '');
+    errorEl.style.display = 'block';
+  } finally {
+    if (refreshBtn) refreshBtn.disabled = false;
+  }
+}
+
+function renderClarityInsights(payload) {
+  const d = payload.insights || {};
+  const fetchedAtEl = document.getElementById('clarityFetchedAt');
+  if (fetchedAtEl && payload.fetchedAt) {
+    const dt = new Date(payload.fetchedAt);
+    fetchedAtEl.textContent = `Updated ${dt.toLocaleString('en-CA', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })}`;
+  }
+
+  // KPIs
+  document.getElementById('clarityKpiSessions').textContent  = (d.totalSessions || 0).toLocaleString();
+  document.getElementById('clarityKpiBots').textContent      =
+    (d.botSessions || 0) > 0 ? `${d.botSessions} bot sessions` : '';
+  document.getElementById('clarityKpiUsers').textContent     = (d.uniqueUsers || 0).toLocaleString();
+  document.getElementById('clarityKpiPageviews').textContent = (d.totalPageViews || 0).toLocaleString();
+  const engSeconds = d.avgEngagementSeconds || 0;
+  document.getElementById('clarityKpiEngagement').textContent =
+    engSeconds >= 60 ? `${Math.round(engSeconds/60)} min` : `${engSeconds} s`;
+  document.getElementById('clarityKpiScroll').textContent =
+    d.avgScrollDepth != null ? `Avg scroll ${d.avgScrollDepth}%` : '';
+
+  // Destroy any previous chart instances (on refresh)
+  Object.values(window._clarityCharts).forEach(c => c && c.destroy && c.destroy());
+  window._clarityCharts = {};
+
+  const red   = getComputedStyle(document.documentElement).getPropertyValue('--red').trim() || '#820000';
+  const cream = '#e6d7a3';
+  const grey  = '#9aa0a6';
+
+  // Countries — horizontal bar
+  if (d.countries && d.countries.length) {
+    window._clarityCharts.countries = new Chart(document.getElementById('chartClarityCountries'), {
+      type: 'bar',
+      data: {
+        labels: d.countries.map(c => c.label),
+        datasets: [{ label: 'Sessions', data: d.countries.map(c => c.sessions), backgroundColor: red, maxBarThickness: 22 }]
+      },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+    });
+  } else {
+    document.getElementById('chartClarityCountries').parentElement.innerHTML =
+      '<div class="empty-mini" style="padding:2rem;text-align:center">No country data yet.</div>';
+  }
+
+  // Devices — doughnut
+  if (d.devices && d.devices.length) {
+    const palette = [red, cream, grey, '#5e35b5', '#2e7d32'];
+    window._clarityCharts.devices = new Chart(document.getElementById('chartClarityDevices'), {
+      type: 'doughnut',
+      data: {
+        labels: d.devices.map(x => x.label),
+        datasets: [{ data: d.devices.map(x => x.sessions), backgroundColor: d.devices.map((_, i) => palette[i % palette.length]) }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+    });
+  } else {
+    document.getElementById('chartClarityDevices').parentElement.innerHTML =
+      '<div class="empty-mini" style="padding:2rem;text-align:center">No device data yet.</div>';
+  }
+
+  // Top pages + referrers (simple lists — more scannable than a chart for long URLs)
+  document.getElementById('clarityTopPages').innerHTML = renderRowList(d.pages, 'No page data yet.');
+  document.getElementById('clarityTopReferrers').innerHTML = renderRowList(d.referrers, 'No referrer data yet (most visitors came directly).');
+
+  // If any buckets errored, log them to console for admin debugging
+  if (payload.errors && payload.errors.length) {
+    console.warn('Clarity API partial errors:', payload.errors);
+  }
+}
+
+function renderRowList(rows, emptyMsg) {
+  if (!rows || !rows.length) return `<div class="empty-mini">${emptyMsg}</div>`;
+  return `<ul style="list-style:none;padding:0;margin:0;font-size:0.85rem">
+    ${rows.map(r => `
+      <li style="display:flex;align-items:center;gap:0.5rem;padding:0.45rem 0.1rem;border-bottom:1px solid #f3f3f3">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</span>
+        <span style="font-weight:700;color:var(--charcoal)">${r.sessions}</span>
+      </li>`).join('')}
+  </ul>`;
 }
 
 // Wire sidebar clicks + insight-sublink "→" links
@@ -2043,6 +2262,12 @@ async function loadSettings() {
     if (clarityInput && settings.clarity_project_id) {
       clarityInput.value = settings.clarity_project_id;
     }
+    // Mask the API token — only indicate whether one is set, never echo the
+    // raw value back (treat it like a password).
+    const tokenInput = document.getElementById('clarityApiToken');
+    if (tokenInput && settings.clarity_api_token) {
+      tokenInput.placeholder = '••••••••  (token saved — paste a new one to replace)';
+    }
     // Update the Analytics-view Clarity status badge
     const clarityBadge = document.getElementById('clarityStatusBadge');
     if (clarityBadge) {
@@ -2077,6 +2302,35 @@ async function saveClarityId() {
       const data = await res.json();
       alert.className = 'alert alert-error';
       alert.textContent = data.error || 'Failed to save Clarity Project ID.';
+    }
+  } catch {
+    alert.className = 'alert alert-error';
+    alert.textContent = 'Network error. Please try again.';
+  }
+  alert.style.display = 'block';
+}
+
+async function saveClarityToken() {
+  const input = document.getElementById('clarityApiToken');
+  const val = input.value.trim();
+  const alert = document.getElementById('settingsAlert');
+  try {
+    const res = await fetch('/api/admin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'clarity_api_token', value: val })
+    });
+    if (res.ok) {
+      alert.className = 'alert alert-success';
+      alert.textContent = val
+        ? 'Clarity API token saved. Visitor metrics will populate in the Analytics view on next refresh.'
+        : 'Clarity API token cleared. Visitor metrics will be unavailable.';
+      input.value = '';
+      if (val) input.placeholder = '••••••••  (token saved — paste a new one to replace)';
+    } else {
+      const data = await res.json();
+      alert.className = 'alert alert-error';
+      alert.textContent = data.error || 'Failed to save Clarity API token.';
     }
   } catch {
     alert.className = 'alert alert-error';

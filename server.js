@@ -191,6 +191,148 @@ async function getSetting(key) {
   } catch { return null; }
 }
 
+// ===== Microsoft Clarity Data Export API =====
+// Docs: https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-data-export-api
+// Hard limit: 10 API calls per project per day. We use 3 buckets and refresh
+// each every 8 hours → 9 calls/day worst case, safely under the cap.
+const CLARITY_API_URL  = 'https://www.clarity.ms/export-data/api/v1/project-live-insights';
+const CLARITY_CACHE_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+
+// Bucket definitions: which dimensions to request in each Clarity API call
+const CLARITY_BUCKETS = {
+  overview:    { dims: [] },                           // totals only
+  geoDevice:   { dims: ['Country', 'Device'] },        // country + device breakdown
+  pagesRefs:   { dims: ['URL', 'Referrer'] }           // top pages + referrers
+};
+
+async function fetchClarityBucket(bucketKey, token, { force = false } = {}) {
+  if (!CLARITY_BUCKETS[bucketKey]) throw new Error(`Unknown bucket: ${bucketKey}`);
+  // Check cache first
+  const { rows: cached } = await pool.query(
+    'SELECT response, fetched_at, error FROM clarity_api_cache WHERE bucket_key = $1',
+    [bucketKey]
+  );
+  if (!force && cached.length) {
+    const age = Date.now() - new Date(cached[0].fetched_at).getTime();
+    if (age < CLARITY_CACHE_TTL_MS && !cached[0].error) {
+      return { data: cached[0].response, cached: true, fetchedAt: cached[0].fetched_at };
+    }
+  }
+
+  // Build query string: numOfDays=3 is max, gives widest window
+  const params = new URLSearchParams({ numOfDays: '3' });
+  CLARITY_BUCKETS[bucketKey].dims.forEach((d, i) => params.set(`dimension${i + 1}`, d));
+
+  try {
+    const r = await fetch(`${CLARITY_API_URL}?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const text = await r.text();
+    if (!r.ok) {
+      const errMsg = `Clarity API ${r.status}: ${text.slice(0, 200)}`;
+      // Upsert an error record so we don't hammer the rate limit on repeated 4xx
+      await pool.query(`
+        INSERT INTO clarity_api_cache (bucket_key, response, fetched_at, error)
+        VALUES ($1, '[]'::jsonb, NOW(), $2)
+        ON CONFLICT (bucket_key) DO UPDATE SET fetched_at = NOW(), error = $2
+      `, [bucketKey, errMsg]);
+      throw new Error(errMsg);
+    }
+    const data = JSON.parse(text);
+    await pool.query(`
+      INSERT INTO clarity_api_cache (bucket_key, response, fetched_at, error)
+      VALUES ($1, $2::jsonb, NOW(), NULL)
+      ON CONFLICT (bucket_key) DO UPDATE SET response = $2::jsonb, fetched_at = NOW(), error = NULL
+    `, [bucketKey, JSON.stringify(data)]);
+    return { data, cached: false, fetchedAt: new Date().toISOString() };
+  } catch (e) {
+    // If we have stale cache data, return that rather than failing completely
+    if (cached.length) {
+      return { data: cached[0].response, cached: true, fetchedAt: cached[0].fetched_at, staleError: e.message };
+    }
+    throw e;
+  }
+}
+
+// Normalize Clarity's verbose response shape into flat KPIs + rollups the UI
+// can render directly. Clarity returns [{ metricName, information: [...] }] —
+// the shape of `information` depends on which dimensions were requested.
+function normalizeClarityData({ overview, geoDevice, pagesRefs }) {
+  const out = {
+    totalSessions: 0,
+    totalPageViews: 0,
+    uniqueUsers: 0,
+    botSessions: 0,
+    avgEngagementSeconds: 0,
+    avgScrollDepth: null,
+    countries: [],   // [{ label, sessions }]
+    devices: [],     // [{ label, sessions }]
+    pages: [],       // [{ label, sessions }]
+    referrers: []    // [{ label, sessions }]
+  };
+
+  const findMetric = (resp, name) => Array.isArray(resp) ? resp.find(m => m.metricName === name) : null;
+
+  // Overview bucket — totals
+  if (Array.isArray(overview)) {
+    const traffic = findMetric(overview, 'Traffic');
+    const info = traffic && traffic.information && traffic.information[0];
+    if (info) {
+      out.totalSessions  = parseInt(info.totalSessionCount || 0, 10);
+      out.totalPageViews = parseInt(info.totalPageViews || info.pageViews || 0, 10);
+      out.uniqueUsers    = parseInt(info.distinctUserCount || info.totalUsers || 0, 10);
+      out.botSessions    = parseInt(info.totalBotSessionCount || 0, 10);
+    }
+    const engagement = findMetric(overview, 'EngagementTime');
+    const e = engagement && engagement.information && engagement.information[0];
+    if (e && e.activeTime != null) out.avgEngagementSeconds = Math.round(parseFloat(e.activeTime));
+
+    const scroll = findMetric(overview, 'ScrollDepth');
+    const s = scroll && scroll.information && scroll.information[0];
+    if (s && s.averageScrollDepth != null) out.avgScrollDepth = Math.round(parseFloat(s.averageScrollDepth));
+  }
+
+  // Geo + Device bucket
+  if (Array.isArray(geoDevice)) {
+    const traffic = findMetric(geoDevice, 'Traffic');
+    if (traffic && Array.isArray(traffic.information)) {
+      const byCountry = new Map();
+      const byDevice  = new Map();
+      traffic.information.forEach(row => {
+        const sessions = parseInt(row.totalSessionCount || row.sessions || 0, 10);
+        if (row.Country) byCountry.set(row.Country, (byCountry.get(row.Country) || 0) + sessions);
+        if (row.Device)  byDevice.set(row.Device,   (byDevice.get(row.Device)   || 0) + sessions);
+      });
+      out.countries = [...byCountry.entries()].map(([label, sessions]) => ({ label, sessions }))
+        .sort((a, b) => b.sessions - a.sessions).slice(0, 10);
+      out.devices = [...byDevice.entries()].map(([label, sessions]) => ({ label, sessions }))
+        .sort((a, b) => b.sessions - a.sessions);
+    }
+  }
+
+  // Pages + Referrers bucket
+  if (Array.isArray(pagesRefs)) {
+    const traffic = findMetric(pagesRefs, 'Traffic');
+    if (traffic && Array.isArray(traffic.information)) {
+      const byUrl = new Map();
+      const byRef = new Map();
+      traffic.information.forEach(row => {
+        const sessions = parseInt(row.totalSessionCount || row.sessions || 0, 10);
+        const url = row.URL || row.Page;
+        const ref = row.Referrer;
+        if (url) byUrl.set(url, (byUrl.get(url) || 0) + sessions);
+        if (ref) byRef.set(ref, (byRef.get(ref) || 0) + sessions);
+      });
+      out.pages = [...byUrl.entries()].map(([label, sessions]) => ({ label, sessions }))
+        .sort((a, b) => b.sessions - a.sessions).slice(0, 10);
+      out.referrers = [...byRef.entries()].map(([label, sessions]) => ({ label, sessions }))
+        .sort((a, b) => b.sessions - a.sessions).slice(0, 10);
+    }
+  }
+
+  return out;
+}
+
 // Copy a registration into the cancelled_registrations archive.
 // Call BEFORE deleting the registration row so class details are still joinable.
 // `cancelledBy` is a free-form label: 'user', 'admin', 'email-link', 'unpaid-release', 'user-deleted'.
@@ -563,6 +705,18 @@ async function initDB() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_pw_resets_user ON password_resets(user_id);
+  `);
+
+  // Microsoft Clarity API response cache — keyed by bucket (e.g. 'overview',
+  // 'geo-device', 'pages-refs') because the Clarity Data Export API is limited
+  // to 10 calls per project per day. We refresh each bucket every 8 hours.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS clarity_api_cache (
+      bucket_key  TEXT PRIMARY KEY,
+      response    JSONB NOT NULL,
+      fetched_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      error       TEXT
+    );
   `);
 
   // Cancelled registrations archive — preserves a record of cancelled bookings
@@ -1403,6 +1557,51 @@ async function createApp() {
         signupsOverTime: signups
       });
     } catch (e) { console.error('Analytics error:', e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Admin: Clarity-pulled visitor insights. Cached 8h per bucket to stay under
+  // Clarity's 10-calls-per-day limit. Pass ?refresh=1 to force fresh fetch.
+  app.get('/api/admin/clarity-insights', requireAdmin, async (req, res) => {
+    try {
+      const token = await getSetting('clarity_api_token');
+      if (!token) {
+        return res.status(400).json({
+          error: 'Clarity API token not configured. Add it in Admin → Settings → Microsoft Clarity.'
+        });
+      }
+      const force = req.query.refresh === '1';
+      const results = {};
+      const errors  = [];
+      let oldestFetch = null;
+
+      for (const key of Object.keys(CLARITY_BUCKETS)) {
+        try {
+          const { data, fetchedAt, staleError } = await fetchClarityBucket(key, token, { force });
+          results[key] = data;
+          if (staleError) errors.push(`${key}: ${staleError} (showing cached)`);
+          if (!oldestFetch || new Date(fetchedAt) < new Date(oldestFetch)) oldestFetch = fetchedAt;
+        } catch (e) {
+          errors.push(`${key}: ${e.message}`);
+          results[key] = null;
+        }
+      }
+
+      const normalized = normalizeClarityData({
+        overview:  results.overview,
+        geoDevice: results.geoDevice,
+        pagesRefs: results.pagesRefs
+      });
+
+      res.json({
+        insights: normalized,
+        fetchedAt: oldestFetch,
+        errors: errors.length ? errors : null,
+        raw: results  // keep raw available for debugging
+      });
+    } catch (e) {
+      console.error('Clarity insights error:', e);
+      res.status(500).json({ error: e.message || 'Server error' });
+    }
   });
 
   // Admin: mark a registration as paid
