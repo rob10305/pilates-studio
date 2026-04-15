@@ -72,6 +72,27 @@
     }
     .waiver-section h3 { font-size: 1rem; margin-bottom: 1.25rem; color: var(--charcoal); }
 
+    /* Pilates experience radio options */
+    .exp-options { display: flex; flex-direction: column; gap: 0.55rem; }
+    .exp-option {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.7rem 0.9rem;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      color: var(--charcoal);
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .exp-option:hover { background: #faf7f2; }
+    .exp-option input[type="radio"] { accent-color: var(--red); cursor: pointer; flex-shrink: 0; }
+    .exp-option:has(input:checked) {
+      background: #fff5f3;
+      border-color: var(--red);
+    }
+
     /* Signature canvas */
     .sig-canvas-wrap {
       border: 1.5px solid var(--border);
@@ -260,6 +281,24 @@
       </div>
     </div>
     <div class="form-group">
+      <label>Pilates Experience *</label>
+      <p style="font-size:0.82rem;color:var(--mid);margin:0 0 0.65rem">Help us tailor the class to your experience level.</p>
+      <div class="exp-options" role="radiogroup" aria-label="Pilates experience">
+        <label class="exp-option">
+          <input type="radio" name="pilatesExperience" value="first_class" required>
+          <span>This will be my first Pilates class</span>
+        </label>
+        <label class="exp-option">
+          <input type="radio" name="pilatesExperience" value="under_5">
+          <span>I've taken fewer than 5 classes</span>
+        </label>
+        <label class="exp-option">
+          <input type="radio" name="pilatesExperience" value="over_5">
+          <span>I've taken more than 5 classes</span>
+        </label>
+      </div>
+    </div>
+    <div class="form-group">
       <label for="wHealth">Medical Conditions / Injuries to Disclose (if any)</label>
       <input type="text" id="wHealth">
     </div>
@@ -425,8 +464,11 @@ async function submitWaiver() {
   const emergencyPhone= document.getElementById('wEmergencyPhone').value.trim();
   const health        = document.getElementById('wHealth').value.trim();
   const typedName     = document.getElementById('wTypedName').value.trim();
+  const expRadio      = document.querySelector('input[name="pilatesExperience"]:checked');
+  const pilatesExperience = expRadio ? expRadio.value : '';
 
   if (!firstName || !lastName || !email)   return showAlert('Please fill in your name and email.', 'error');
+  if (!pilatesExperience)                  return showAlert('Please select your Pilates experience level.', 'error');
   if (!typedName)                          return showAlert('Please type your full name to confirm your electronic signature.', 'error');
   if (!document.getElementById('chkRead').checked)       return showAlert('Please confirm you have read the waiver.', 'error');
   if (!document.getElementById('chkUnderstand').checked) return showAlert('Please confirm you understand the waiver.', 'error');
@@ -443,12 +485,12 @@ async function submitWaiver() {
     const res  = await fetch('/api/waiver', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firstName, lastName, email, phone, emergencyName, emergencyPhone, health, typedName, signatureData })
+      body: JSON.stringify({ firstName, lastName, email, phone, emergencyName, emergencyPhone, health, pilatesExperience, typedName, signatureData })
     });
     const data = await res.json();
 
     if (res.ok) {
-      showSuccess({ firstName, lastName, email, phone, emergencyName, emergencyPhone, health, typedName, signatureData, signedAt: new Date().toISOString() });
+      showSuccess({ firstName, lastName, email, phone, emergencyName, emergencyPhone, health, pilatesExperience, typedName, signatureData, signedAt: new Date().toISOString() });
     } else {
       showAlert(data.error || 'Submission failed. Please try again.', 'error');
       btn.disabled = false;

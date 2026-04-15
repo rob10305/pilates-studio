@@ -191,6 +191,47 @@ async function sendRemovalEmail({ to, firstName, cls }) {
   });
 }
 
+// Sent when a user cancels their own booking (via My Schedule portal or
+// via the email cancellation link). Wording adapts to the refund outcome.
+async function sendSelfCancellationEmail({ to, firstName, cls, refundType }) {
+  if (!process.env.RESEND_API_KEY) return;
+  const policyLink = `<a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>`;
+  const refundBlock =
+    refundType === 'cash'
+      ? `<div style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:8px;padding:14px 16px;margin:8px 0">
+           <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#2e7d32;letter-spacing:0.05em;text-transform:uppercase">Refund on the way</p>
+           <p style="margin:0;font-size:14px;color:#3a3a3a">You cancelled more than 24 hours before class, so your <strong>$25 payment will be refunded via e-Transfer within 2–3 business days</strong>.</p>
+         </div>`
+      : refundType === 'credit'
+      ? `<div style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:8px;padding:14px 16px;margin:8px 0">
+           <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#2e7d32;letter-spacing:0.05em;text-transform:uppercase">Credit returned</p>
+           <p style="margin:0;font-size:14px;color:#3a3a3a">You cancelled more than 24 hours before class, so <strong>1 class credit has been returned to your account</strong> and is ready to use on any future class.</p>
+         </div>`
+      : `<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:8px;padding:14px 16px;margin:8px 0">
+           <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#e65100;letter-spacing:0.05em;text-transform:uppercase">No refund or credit</p>
+           <p style="margin:0;font-size:14px;color:#3a3a3a">This cancellation is within 24 hours of class start, so per our ${policyLink} no refund or credit return applies.</p>
+         </div>`;
+  await getResend().emails.send({
+    from: FROM_ADDRESS,
+    to,
+    subject: `Cancellation Confirmed: ${cls.title} on ${formatClassDate(cls.date)}`,
+    html: emailWrap({
+      heading: 'Cancellation Confirmed',
+      subtitle: `Hi ${firstName || 'there'} — we've cancelled your booking as requested.`,
+      detailRows: [
+        ['Class',      cls.title],
+        ['Date',       formatClassDate(cls.date)],
+        ['Time',       formatClassTime(cls.time)],
+        ['Instructor', cls.instructor || 'Amanda']
+      ],
+      body: refundBlock +
+        `<p style="font-size:13px;color:#6b6b6b;margin:12px 0 0">Questions? Reply to this email or reach out at <a href="mailto:amanda@redmaplemovement.ca" style="color:#820000">amanda@redmaplemovement.ca</a>. See our ${policyLink} for details.</p>`,
+      buttonLabel: 'Back to Red Maple Movement',
+      buttonUrl: APP_URL
+    })
+  });
+}
+
 async function sendReminderEmail({ to, firstName, cls, registrationId }) {
   if (!process.env.RESEND_API_KEY) return;
   const cancelUrl = `${APP_URL}/api/registrations/${registrationId}/cancel?token=${cancelToken(registrationId)}`;
@@ -687,6 +728,13 @@ async function initDB() {
       signature_data  TEXT NOT NULL,
       signed_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  // Add pilates_experience column — captured at waiver signing ('first_class',
+  // 'under_5', or 'over_5'). Nullable for pre-existing waivers signed before
+  // this field was introduced.
+  await pool.query(`
+    ALTER TABLE waivers ADD COLUMN IF NOT EXISTS pilates_experience TEXT NOT NULL DEFAULT '';
   `);
 
   // Settings table (key-value store for admin configuration)
@@ -1532,7 +1580,7 @@ async function createApp() {
     if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
     try {
       const { rows } = await pool.query(`
-        SELECT r.*, c.date, c.time FROM registrations r
+        SELECT r.*, c.title, c.date, c.time, c.instructor FROM registrations r
         JOIN classes c ON c.id = r."classId"
         WHERE r.id = $1 AND LOWER(r.email) = LOWER($2)
       `, [req.params.id, req.user.email]);
@@ -1540,10 +1588,48 @@ async function createApp() {
       const reg = rows[0];
       const classStart = new Date(`${reg.date}T${reg.time}`);
       const hoursUntilClass = (classStart - new Date()) / (1000 * 60 * 60);
-      const refundEligible = hoursUntilClass > 24;
+      const withinWindow = hoursUntilClass > 24;
+
+      // Figure out what kind of refund applies:
+      //   - 'cash'   : paid drop-in inside window → refund $25 e-Transfer
+      //   - 'credit' : paid 4-pack or credit booking inside window → +1 credit
+      //   - 'none'   : outside window, or unpaid pending booking (nothing to reverse)
+      let refundType = 'none';
+      let creditBalance = null;
+      if (withinWindow) {
+        if (reg.package_type === 'single' && reg.payment_status === 'paid') {
+          refundType = 'cash';
+        } else if (reg.package_type === 'credit' ||
+                  (reg.package_type === '4pack' && reg.payment_status === 'paid')) {
+          refundType = 'credit';
+          // Return the credit to the user's balance
+          if (reg.user_id) {
+            await pool.query(`
+              INSERT INTO user_credits (user_id, balance, updated_at) VALUES ($1, 1, NOW())
+              ON CONFLICT (user_id) DO UPDATE SET balance = user_credits.balance + 1, updated_at = NOW()
+            `, [reg.user_id]);
+            const { rows: cr } = await pool.query('SELECT balance FROM user_credits WHERE user_id = $1', [reg.user_id]);
+            creditBalance = cr.length ? cr[0].balance : null;
+          }
+        }
+      }
+
       await archiveRegistration(req.params.id, 'user');
       await pool.query('DELETE FROM registrations WHERE id = $1', [req.params.id]);
-      res.json({ success: true, refundEligible });
+      res.json({
+        success: true,
+        refundType,
+        creditBalance,
+        // Back-compat for any older clients still reading this flag
+        refundEligible: withinWindow
+      });
+      // Send cancellation confirmation email — fire-and-forget after response
+      sendSelfCancellationEmail({
+        to: reg.email,
+        firstName: reg.firstName,
+        cls: { title: reg.title, date: reg.date, time: reg.time, instructor: reg.instructor },
+        refundType
+      }).catch(e => console.error('Cancellation email error:', e.message));
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
@@ -1932,7 +2018,7 @@ async function createApp() {
       return res.status(400).send('<h2>Invalid or expired cancellation link.</h2>');
     try {
       const { rows } = await pool.query(`
-        SELECT r.*, c.date, c.time, c.title
+        SELECT r.*, c.date, c.time, c.title, c.instructor
         FROM registrations r JOIN classes c ON c.id = r."classId"
         WHERE r.id = $1
       `, [id]);
@@ -1940,14 +2026,42 @@ async function createApp() {
       const reg = rows[0];
       const classStart = new Date(`${reg.date}T${reg.time}`);
       const hoursUntilClass = (classStart - new Date()) / (1000 * 60 * 60);
-      const refundEligible = hoursUntilClass > 24;
+      const withinWindow = hoursUntilClass > 24;
+
+      // Determine refund type (same rules as /api/my-registrations/:id)
+      let refundType = 'none';
+      if (withinWindow) {
+        if (reg.package_type === 'single' && reg.payment_status === 'paid') {
+          refundType = 'cash';
+        } else if (reg.package_type === 'credit' ||
+                  (reg.package_type === '4pack' && reg.payment_status === 'paid')) {
+          refundType = 'credit';
+          if (reg.user_id) {
+            await pool.query(`
+              INSERT INTO user_credits (user_id, balance, updated_at) VALUES ($1, 1, NOW())
+              ON CONFLICT (user_id) DO UPDATE SET balance = user_credits.balance + 1, updated_at = NOW()
+            `, [reg.user_id]);
+          }
+        }
+      }
 
       await archiveRegistration(id, 'email-link');
       await pool.query('DELETE FROM registrations WHERE id = $1', [id]);
 
-      const refundNote = refundEligible
-        ? 'As you cancelled more than 24 hours before the class, your $25 payment will be refunded within 2–3 business days.'
-        : 'Cancellations within 24 hours of class start are not eligible for a refund per our <a href="' + APP_URL + '/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>.';
+      // Also send a follow-up confirmation email (in addition to the HTML
+      // response the user sees after clicking the cancel link in email)
+      sendSelfCancellationEmail({
+        to: reg.email,
+        firstName: reg.firstName,
+        cls: { title: reg.title, date: reg.date, time: reg.time, instructor: reg.instructor },
+        refundType
+      }).catch(e => console.error('Cancellation email error:', e.message));
+
+      const policyLink = `<a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>`;
+      const refundNote =
+        refundType === 'cash'   ? 'As you cancelled more than 24 hours before the class, your $25 payment will be refunded within 2–3 business days.'
+      : refundType === 'credit' ? 'As you cancelled more than 24 hours before the class, 1 class credit has been returned to your account and is ready to use on any future class.'
+      :                           `Cancellations within 24 hours of class start are not eligible for a refund or credit return per our ${policyLink}.`;
 
       res.send(emailWrap({
         heading: 'Booking Cancelled',
@@ -2097,9 +2211,14 @@ async function createApp() {
 
   // Waiver routes
   app.post('/api/waiver', async (req, res) => {
-    const { firstName, lastName, email, phone, emergencyName, emergencyPhone, healthConditions, signatureData } = req.body;
+    const { firstName, lastName, email, phone, emergencyName, emergencyPhone, signatureData } = req.body;
+    // Accept either 'health' (current client) or 'healthConditions' (legacy)
+    const healthConditions = req.body.health || req.body.healthConditions || '';
+    const pilatesExperience = req.body.pilatesExperience || '';
     if (!firstName || !lastName || !email || !signatureData)
       return res.status(400).json({ error: 'Missing required fields.' });
+    if (!pilatesExperience)
+      return res.status(400).json({ error: 'Please select your Pilates experience level.' });
     const userId = req.isAuthenticated() ? req.user.id : null;
     try {
       // Check for existing waiver by email
@@ -2111,9 +2230,9 @@ async function createApp() {
         await pool.query(`
           UPDATE waivers SET first_name=$1, last_name=$2, phone=$3, emergency_name=$4,
             emergency_phone=$5, health_conditions=$6, signature_data=$7, signed_at=NOW(),
-            user_id=COALESCE($8, user_id)
+            user_id=COALESCE($8, user_id), pilates_experience=$10
           WHERE LOWER(email) = LOWER($9)`,
-          [firstName, lastName, phone||'', emergencyName||'', emergencyPhone||'', healthConditions||'', signatureData, userId, email]
+          [firstName, lastName, phone||'', emergencyName||'', emergencyPhone||'', healthConditions, signatureData, userId, email, pilatesExperience]
         );
         const { rows } = await pool.query('SELECT * FROM waivers WHERE LOWER(email) = LOWER($1)', [email]);
         res.json({ success: true, waiver: rows[0] });
@@ -2123,9 +2242,9 @@ async function createApp() {
       }
       const id = Date.now().toString();
       await pool.query(`
-        INSERT INTO waivers (id, user_id, first_name, last_name, email, phone, emergency_name, emergency_phone, health_conditions, signature_data)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [id, userId, firstName, lastName, email.toLowerCase(), phone||'', emergencyName||'', emergencyPhone||'', healthConditions||'', signatureData]
+        INSERT INTO waivers (id, user_id, first_name, last_name, email, phone, emergency_name, emergency_phone, health_conditions, signature_data, pilates_experience)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [id, userId, firstName, lastName, email.toLowerCase(), phone||'', emergencyName||'', emergencyPhone||'', healthConditions, signatureData, pilatesExperience]
       );
       const { rows } = await pool.query('SELECT * FROM waivers WHERE id = $1', [id]);
       res.status(201).json({ success: true, waiver: rows[0] });
@@ -2151,11 +2270,21 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
+  // Human-readable label for the Pilates experience radio value
+  function pilatesExperienceLabel(v) {
+    switch (v) {
+      case 'first_class': return 'This will be my first Pilates class';
+      case 'under_5':     return 'Fewer than 5 classes';
+      case 'over_5':      return 'More than 5 classes';
+      default:            return '—';
+    }
+  }
+
   app.get('/api/waiver/my', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not signed in.' });
     try {
       const { rows } = await pool.query(
-        'SELECT id, first_name, last_name, email, phone, emergency_name, emergency_phone, health_conditions, signature_data, signed_at FROM waivers WHERE user_id = $1 OR LOWER(email) = LOWER($2) ORDER BY signed_at DESC LIMIT 1',
+        'SELECT id, first_name, last_name, email, phone, emergency_name, emergency_phone, health_conditions, pilates_experience, signature_data, signed_at FROM waivers WHERE user_id = $1 OR LOWER(email) = LOWER($2) ORDER BY signed_at DESC LIMIT 1',
         [req.user.id, req.user.email]
       );
       if (rows.length === 0) return res.status(404).json({ error: 'No waiver found.' });
@@ -2193,6 +2322,7 @@ async function createApp() {
         <div class="field"><div class="label">Email</div><div class="value">${w.email}</div></div>
         <div class="field"><div class="label">Phone</div><div class="value">${w.phone || '—'}</div></div>
         <div class="field"><div class="label">Emergency Contact</div><div class="value">${w.emergency_name || '—'}${w.emergency_phone ? ' · ' + w.emergency_phone : ''}</div></div>
+        <div class="field"><div class="label">Pilates Experience</div><div class="value">${pilatesExperienceLabel(w.pilates_experience)}</div></div>
         <div class="field"><div class="label">Health Conditions</div><div class="value">${w.health_conditions || 'None stated'}</div></div>
         ${w.signature_data ? `<div class="field sig"><div class="label">Signature</div><img src="${w.signature_data}" alt="Signature"></div>` : ''}
         <p style="margin-top:2rem"><button onclick="window.print()" style="background:#8B1A1A;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:1rem">Print / Save PDF</button></p>
@@ -2225,6 +2355,7 @@ async function createApp() {
         <div class="field"><div class="label">Email</div><div class="value">${w.email}</div></div>
         <div class="field"><div class="label">Phone</div><div class="value">${w.phone || '—'}</div></div>
         <div class="field"><div class="label">Emergency Contact</div><div class="value">${w.emergency_name || '—'}${w.emergency_phone ? ' · ' + w.emergency_phone : ''}</div></div>
+        <div class="field"><div class="label">Pilates Experience</div><div class="value">${pilatesExperienceLabel(w.pilates_experience)}</div></div>
         <div class="field"><div class="label">Health Conditions</div><div class="value">${w.health_conditions || 'None stated'}</div></div>
         ${w.signature_data ? `<div class="field sig"><div class="label">Signature</div><img src="${w.signature_data}" alt="Signature"></div>` : ''}
         <p style="margin-top:2rem"><button onclick="window.print()" style="background:#8B1A1A;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-size:1rem">Print / Save PDF</button></p>

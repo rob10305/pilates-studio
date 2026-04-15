@@ -553,11 +553,18 @@ async function cancelRegistration(id, title) {
   const res = await fetch(`/api/my-registrations/${id}`, { method: 'DELETE' });
   if (res.ok) {
     const data = await res.json().catch(() => ({}));
-    if (data.refundEligible) {
-      alert('Booking cancelled. As you cancelled more than 24 hours before class, your $25 payment will be refunded within 2–3 business days.');
-    } else {
-      alert('Booking cancelled. As this cancellation is within 24 hours of class start, the $25 fee is non-refundable per our Cancellation Policy.');
+    let msg;
+    switch (data.refundType) {
+      case 'cash':
+        msg = 'Booking cancelled. As you cancelled more than 24 hours before class, your $25 payment will be refunded via e-Transfer within 2–3 business days.';
+        break;
+      case 'credit':
+        msg = `Booking cancelled. 1 class credit has been returned to your account${data.creditBalance != null ? ` (you now have ${data.creditBalance} credit${data.creditBalance === 1 ? '' : 's'})` : ''} and is ready to use on any future class.`;
+        break;
+      default:
+        msg = 'Booking cancelled. As this cancellation is within 24 hours of class start, it is not eligible for a refund or credit return per our Cancellation Policy.';
     }
+    alert(msg);
     loadMySchedule();
   } else {
     const data = await res.json().catch(() => ({}));
