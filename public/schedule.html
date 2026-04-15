@@ -101,6 +101,20 @@
     .cart-remove-btn:hover { background: var(--red); color: #fff; border-color: var(--red); }
     .cart-footer { padding: 0.9rem 1.25rem 1.1rem; }
     .cart-summary { font-size: 0.8rem; color: var(--mid); margin-bottom: 0.75rem; line-height: 1.4; }
+    .cart-addmore {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.65rem;
+      margin: 0.85rem 0 0.25rem;
+      padding: 0.7rem 0.85rem;
+      background: #fff8f2;
+      border: 1px dashed var(--red);
+      border-radius: 8px;
+    }
+    .cart-addmore-icon { font-size: 1.1rem; line-height: 1.2; flex-shrink: 0; }
+    .cart-addmore-title { font-size: 0.85rem; font-weight: 700; color: var(--charcoal); margin: 0 0 0.2rem; }
+    .cart-addmore-sub { font-size: 0.78rem; color: var(--mid); margin: 0; line-height: 1.4; }
+    .cart-addmore-sub strong { color: var(--red); }
     .btn-cart-checkout {
       display: block;
       width: 100%;
@@ -198,6 +212,16 @@
         <button class="cart-clear-btn" onclick="clearCart()">Clear all</button>
       </div>
       <div id="cartList"></div>
+
+      <!-- Prompts the user to keep browsing + highlights the 4-pack discount -->
+      <div class="cart-addmore" id="cartAddMore" style="display:none">
+        <span class="cart-addmore-icon">📅</span>
+        <div>
+          <p class="cart-addmore-title">Want to add another class?</p>
+          <p class="cart-addmore-sub" id="cartAddMoreSub">Pick a date on the calendar to see more options.</p>
+        </div>
+      </div>
+
       <div class="cart-footer">
         <p class="cart-summary" id="cartSummary"></p>
         <button class="btn-cart-checkout" onclick="checkout()">Checkout &amp; Register →</button>
@@ -470,7 +494,31 @@ function renderCart() {
   `).join('');
 
   const n = cartItems.length;
-  summary.textContent = `${n} class${n !== 1 ? 'es' : ''} selected · $${n * 25} CAD pay-per-class`;
+
+  // "Add more" callout — messaging shifts based on how close they are to a 4-pack
+  const addMore    = document.getElementById('cartAddMore');
+  const addMoreSub = document.getElementById('cartAddMoreSub');
+  if (addMore) {
+    addMore.style.display = 'flex';
+    if (n < 4) {
+      const needed = 4 - n;
+      addMoreSub.innerHTML =
+        `Add <strong>${needed} more</strong> and you'll unlock the <strong>4-class bundle for $85</strong> ` +
+        `(save $15 vs. drop-in). Pick another date on the calendar ←`;
+    } else if (n === 4) {
+      addMoreSub.innerHTML = `Perfect — <strong>4-class bundle ($85)</strong> applied at checkout. Want more? Keep adding.`;
+    } else {
+      addMoreSub.innerHTML = `Nice stack! You'll get the <strong>4-class bundle ($85)</strong> + <strong>${n - 4} drop-in${n - 4 !== 1 ? 's' : ''}</strong> at checkout.`;
+    }
+  }
+
+  // Summary line with corrected pricing preview
+  let summaryText;
+  if (n === 1) summaryText = `1 class selected · $25 CAD pay-per-class`;
+  else if (n < 4) summaryText = `${n} classes selected · $${n * 25} CAD pay-per-class`;
+  else if (n === 4) summaryText = `4 classes selected · $85 CAD (4-class bundle — save $15)`;
+  else             summaryText = `${n} classes selected · $${85 + (n - 4) * 25} CAD (bundle + ${n - 4} drop-in)`;
+  summary.textContent = summaryText;
 }
 
 function formatDateShort(dateStr) {
