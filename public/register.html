@@ -555,7 +555,7 @@ function showCartSuccess(firstName, classes, packageType, creditsRemaining) {
       <p style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:#820000;margin-bottom:0.75rem">$85 CAD</p>
       <p style="font-size:0.9rem;color:var(--mid);margin-bottom:0.25rem">Send via Interac e-Transfer to</p>
       <p style="font-size:1.05rem;font-weight:700;color:var(--charcoal);margin-bottom:0.75rem">amanda@redmaplemovement.ca</p>
-      <p style="font-size:0.82rem;color:var(--mid);margin-bottom:1.5rem">Once payment is confirmed, 3 credits will be added to your account for future classes.</p>`;
+      <p style="font-size:0.82rem;color:var(--mid);margin-bottom:1.5rem">Once payment is confirmed, ${4 - n} credit${(4 - n) !== 1 ? 's' : ''} will be added to your account for future classes.</p>`;
   } else {
     const total = n * 25;
     paymentBlock = `
