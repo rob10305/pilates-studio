@@ -1068,6 +1068,7 @@ async function createApp() {
     try {
       const { rows } = await pool.query(`
         SELECT r.id, r."classId", r."firstName", r."lastName", r.email, r.phone, r."registeredAt",
+               r.payment_status, r.package_type,
                c.title, c.date, c.time, c.instructor, c.duration, c.description
         FROM registrations r
         JOIN classes c ON c.id = r."classId"
@@ -1075,6 +1076,41 @@ async function createApp() {
         ORDER BY c.date ASC, c.time ASC
       `, [req.user.email]);
       res.json(rows);
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // Combined account summary for my-schedule.html — credits balance + bundle history
+  app.get('/api/my-account-summary', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' });
+    try {
+      const userId = req.user.id;
+      const email  = req.user.email;
+
+      const { rows: cr } = await pool.query('SELECT balance FROM user_credits WHERE user_id = $1', [userId]);
+      const creditBalance = cr.length ? cr[0].balance : 0;
+
+      // Count every 4-pack purchase on record (active + cancelled) to compute total credits purchased
+      const { rows: activeBundles } = await pool.query(`
+        SELECT COUNT(*)::int AS n FROM registrations
+        WHERE package_type = '4pack' AND (user_id = $1 OR LOWER(email) = LOWER($2))
+      `, [userId, email]);
+      const { rows: cancelledBundles } = await pool.query(`
+        SELECT COUNT(*)::int AS n FROM cancelled_registrations
+        WHERE package_type = '4pack' AND (user_id = $1 OR LOWER(email) = LOWER($2))
+      `, [userId, email]);
+      const bundleCount = (activeBundles[0]?.n || 0) + (cancelledBundles[0]?.n || 0);
+
+      // Count pending payments for a quick summary banner
+      const { rows: pending } = await pool.query(`
+        SELECT COUNT(*)::int AS n FROM registrations
+        WHERE payment_status != 'paid' AND (user_id = $1 OR LOWER(email) = LOWER($2))
+      `, [userId, email]);
+
+      res.json({
+        creditBalance,
+        bundleCount,
+        pendingPayments: pending[0]?.n || 0
+      });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 

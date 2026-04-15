@@ -149,6 +149,95 @@
       .no-bookings-msg .big-icon { font-size: 2rem; margin-bottom: 0.25rem; }
       .my-schedule-wrap { padding-bottom: 1rem; }
     }
+
+    /* Payment status pill on each booking card */
+    .pay-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 3px 10px;
+      border-radius: 12px;
+      margin-top: 0.4rem;
+      text-transform: uppercase;
+    }
+    .pay-pill.paid { background: #e8f5e9; color: #2e7d32; }
+    .pay-pill.pending { background: #fff3e0; color: #e65100; }
+    .pkg-pill {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 3px 9px;
+      border-radius: 12px;
+      margin-top: 0.4rem;
+      margin-left: 0.35rem;
+      text-transform: uppercase;
+    }
+    .pkg-pill.bundle { background: #ffe0e0; color: #820000; }
+    .pkg-pill.credit { background: #ede7f6; color: #5e35b5; }
+    .pkg-pill.single { background: #eceff1; color: #546e7a; }
+
+    /* Account summary section */
+    .account-summary {
+      margin-top: 2rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 560px) {
+      .account-summary { grid-template-columns: 1fr; }
+    }
+    .summary-card {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 10px;
+      padding: 1.1rem 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .summary-card.has-pending { border-color: #e65100; background: #fff8f0; }
+    .summary-card.has-credits { border-color: var(--red); background: #fffafa; }
+    .summary-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--mid);
+      margin: 0 0 0.5rem;
+    }
+    .summary-value {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--dark);
+      margin: 0 0 0.3rem;
+      line-height: 1;
+    }
+    .summary-value.paid-ok { color: #2e7d32; }
+    .summary-value.has-pending { color: #e65100; }
+    .summary-sub {
+      font-size: 0.82rem;
+      color: var(--mid);
+      line-height: 1.45;
+      margin: 0;
+    }
+    .summary-progress {
+      height: 6px;
+      background: #f0e6e6;
+      border-radius: 3px;
+      margin-top: 0.6rem;
+      overflow: hidden;
+    }
+    .summary-progress > span {
+      display: block;
+      height: 100%;
+      background: var(--red);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
   </style>
 </head>
 <body>
@@ -179,6 +268,13 @@
       <div style="font-size:2rem">⏳</div>
       <p>Loading your schedule…</p>
     </div>
+  </div>
+
+  <!-- Account summary — credits remaining & payment status.
+       Parent is hidden by JS when there's nothing useful to show. -->
+  <div id="accountSummarySection" style="display:none">
+    <div class="section-heading" style="margin-top:2.5rem">💼 Account Summary</div>
+    <div class="account-summary" id="accountSummary"></div>
   </div>
 </div>
 
@@ -311,6 +407,9 @@ async function loadMySchedule() {
 
   // Load waiver status
   loadWaiverStatus();
+
+  // Load the account summary (credits balance + payment status)
+  loadAccountSummary();
 }
 
 async function loadWaiverStatus() {
@@ -344,6 +443,18 @@ async function loadWaiverStatus() {
 
 function bookingCard(r, isPast) {
   const [y, mo, d] = r.date.split('-').map(Number);
+  const isPaid = r.payment_status === 'paid';
+  const payPill = isPast
+    ? ''
+    : isPaid
+      ? '<span class="pay-pill paid">✓ Payment Confirmed</span>'
+      : '<span class="pay-pill pending">⏳ Payment Pending</span>';
+  const pkg = r.package_type || 'single';
+  const pkgPill = pkg === '4pack'
+    ? '<span class="pkg-pill bundle">4-Pack</span>'
+    : pkg === 'credit'
+      ? '<span class="pkg-pill credit">Credit</span>'
+      : '<span class="pkg-pill single">Drop-in</span>';
   return `
     <div class="booking-card${isPast ? ' past' : ''}">
       <div class="booking-date-badge">
@@ -358,12 +469,83 @@ function bookingCard(r, isPast) {
           <span>👤 ${esc(r.instructor)}</span>
         </div>
         <div style="font-size:0.78rem;color:var(--mid);margin-top:0.35rem">${formatFullDate(r.date)}</div>
+        <div>${payPill}${payPill ? pkgPill : ''}</div>
       </div>
       ${!isPast ? `
       <div class="booking-actions">
         <button class="btn-cancel cancel-btn" data-id="${esc(r.id)}" data-title="${esc(r.title)}">Cancel</button>
       </div>` : ''}
     </div>`;
+}
+
+// Load account summary (credits + payment status) and render the two summary cards
+async function loadAccountSummary() {
+  const host = document.getElementById('accountSummary');
+  if (!host) return;
+  try {
+    const res = await fetch('/api/my-account-summary');
+    if (!res.ok) return;
+    const data = await res.json();
+    const { creditBalance, bundleCount, pendingPayments } = data;
+
+    // Only render the whole section if there's something useful to show
+    // (either a bundle on record OR some pending payment)
+    if (bundleCount === 0 && pendingPayments === 0 && creditBalance === 0) {
+      host.innerHTML = '';
+      host.parentElement.style.display = 'none';
+      return;
+    }
+    host.parentElement.style.display = '';
+
+    // Payment-status card
+    const payCard = pendingPayments > 0
+      ? `<div class="summary-card has-pending">
+           <p class="summary-label">💳 Payment Status</p>
+           <p class="summary-value has-pending">${pendingPayments} Pending</p>
+           <p class="summary-sub">
+             You have ${pendingPayments} booking${pendingPayments !== 1 ? 's' : ''} awaiting payment.
+             Send Interac e-Transfer to
+             <a href="mailto:amanda@redmaplemovement.ca" style="color:var(--red);font-weight:600">amanda@redmaplemovement.ca</a>
+             to confirm your ${pendingPayments !== 1 ? 'spots' : 'spot'}.
+           </p>
+         </div>`
+      : `<div class="summary-card">
+           <p class="summary-label">💳 Payment Status</p>
+           <p class="summary-value paid-ok">All Paid ✓</p>
+           <p class="summary-sub">Every booking on your account is paid in full. You're all set.</p>
+         </div>`;
+
+    // Bundle / credit card — only if they've ever purchased a 4-pack
+    let bundleCard = '';
+    if (bundleCount > 0) {
+      const totalPurchased = bundleCount * 4;
+      const usedSoFar = Math.max(0, totalPurchased - creditBalance);
+      const pct = totalPurchased > 0 ? Math.min(100, Math.round((creditBalance / totalPurchased) * 100)) : 0;
+      bundleCard = `
+        <div class="summary-card has-credits">
+          <p class="summary-label">🎟️ Class Credits</p>
+          <p class="summary-value">${creditBalance} <span style="font-size:0.9rem;color:var(--mid);font-weight:600">left</span></p>
+          <p class="summary-sub">
+            ${bundleCount > 1
+              ? `${bundleCount} × 4-class bundles purchased — ${usedSoFar} used, ${creditBalance} remaining.`
+              : `From your 4-class bundle — ${usedSoFar} used, ${creditBalance} remaining.`}
+          </p>
+          <div class="summary-progress" title="${creditBalance} of ${totalPurchased} remaining">
+            <span style="width:${pct}%"></span>
+          </div>
+        </div>`;
+    } else if (creditBalance > 0) {
+      // Credits awarded manually without a 4-pack on record
+      bundleCard = `
+        <div class="summary-card has-credits">
+          <p class="summary-label">🎟️ Class Credits</p>
+          <p class="summary-value">${creditBalance} <span style="font-size:0.9rem;color:var(--mid);font-weight:600">available</span></p>
+          <p class="summary-sub">Your credits will be applied automatically when you book your next class.</p>
+        </div>`;
+    }
+
+    host.innerHTML = payCard + bundleCard;
+  } catch (_) { /* silent — summary is non-critical */ }
 }
 
 async function cancelRegistration(id, title) {
