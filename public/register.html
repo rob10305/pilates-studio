@@ -755,6 +755,8 @@ loadClasses();
       if (user.firstName) document.getElementById('firstName').value = user.firstName;
       if (user.lastName)  document.getElementById('lastName').value  = user.lastName;
       if (user.email)     document.getElementById('email').value     = user.email;
+      // Pre-fill phone from their most recent booking (pulled server-side)
+      if (user.phone)     document.getElementById('phone').value     = user.phone;
       // Already signed in — hide account creation section
       isLoggedIn = true;
       document.getElementById('accountSection').style.display = 'none';

@@ -1129,10 +1129,23 @@ async function createApp() {
     } catch (e) { console.error('image delete error:', e); res.status(500).json({ error: 'Server error' }); }
   });
 
-  app.get('/auth/me', (req, res) => {
+  app.get('/auth/me', async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ user: null });
     const { id, email, first_name, last_name, is_admin } = req.user;
-    res.json({ user: { id, email, firstName: first_name, lastName: last_name, isAdmin: !!is_admin } });
+    // Pull the most recently used phone number from their bookings so the
+    // register page can pre-fill it on return visits. Non-fatal if it fails.
+    let phone = '';
+    try {
+      const { rows } = await pool.query(
+        `SELECT phone FROM registrations
+         WHERE (user_id = $1 OR LOWER(email) = LOWER($2)) AND phone IS NOT NULL AND phone != ''
+         ORDER BY "registeredAt" DESC
+         LIMIT 1`,
+        [id, email]
+      );
+      if (rows.length) phone = rows[0].phone;
+    } catch (e) { /* ignore — just means no pre-fill */ }
+    res.json({ user: { id, email, firstName: first_name, lastName: last_name, isAdmin: !!is_admin, phone } });
   });
 
   app.post('/auth/signup', async (req, res) => {
