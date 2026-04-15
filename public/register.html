@@ -311,6 +311,10 @@ function renderCartMode() {
   document.getElementById('classSelectGroup').style.display = 'none';
   document.getElementById('classBanner').style.display = 'none';
   document.getElementById('cartClassesBanner').style.display = 'block';
+  // Disable the hidden select so browser validation doesn't block submit
+  const sel = document.getElementById('classSelect');
+  sel.required = false;
+  sel.disabled = true;
 
   const sorted = [...cartClasses].sort((a, b) =>
     new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`)
