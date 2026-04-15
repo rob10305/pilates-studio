@@ -288,10 +288,10 @@ async function sendReminderEmail({ to, firstName, cls, registrationId }) {
   await getResend().emails.send({
     from: FROM_ADDRESS,
     to,
-    subject: `Reminder: ${cls.title} is tomorrow at ${formatClassTime(cls.time)}`,
+    subject: `See you tomorrow — ${cls.title} at ${formatClassTime(cls.time)}`,
     html: emailWrap({
-      heading: `See You Tomorrow, ${firstName}!`,
-      subtitle: 'This is a friendly reminder about your class.',
+      heading: `We look forward to seeing you tomorrow, ${firstName}!`,
+      subtitle: `Just a quick reminder about your ${cls.title} class. Can't wait to move with you.`,
       detailRows: [
         ['Class', cls.title],
         ['Date', formatClassDate(cls.date)],
@@ -299,8 +299,14 @@ async function sendReminderEmail({ to, firstName, cls, registrationId }) {
         ['Instructor', cls.instructor],
         ['Duration', `${cls.duration} minutes`],
       ],
-      body: `<p style="font-size:14px;color:#6b6b6b">Can't make it? <a href="${cancelUrl}" style="color:#820000">Cancel your booking</a> so your spot can go to someone else.</p>`,
-      buttonLabel: 'Manage My Booking',
+      body:
+        `<p style="font-size:14px;color:#3a3a3a;margin:0 0 10px">
+           <strong>A few things to bring:</strong> comfortable clothing you can move in, a water bottle,
+           and an open mindset. Mats are provided.
+         </p>
+         <p style="font-size:13px;color:#6b6b6b;margin:0 0 8px">Running late or can't make it? <a href="${cancelUrl}" style="color:#820000">Cancel your booking</a> so the spot can go to someone else (cancellations more than 24 hours ahead are fully refundable — see our <a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>).</p>
+         <p style="font-size:13px;color:#3a3a3a;margin:0">See you on the mat! 🤍</p>`,
+      buttonLabel: 'View My Schedule',
       buttonUrl: `${APP_URL}/my-schedule.html`
     })
   });
@@ -844,6 +850,12 @@ async function initDB() {
   // Add package_type column — 'single', '4pack', or 'credit'
   await pool.query(`
     ALTER TABLE registrations ADD COLUMN IF NOT EXISTS package_type TEXT NOT NULL DEFAULT 'single';
+  `);
+
+  // reminder_sent_at — stamped when the 23-hour reminder email has been sent
+  // so the hourly cron doesn't send duplicates. NULL means 'not yet sent'.
+  await pool.query(`
+    ALTER TABLE registrations ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;
   `);
 
   // batch_id — groups sibling registrations created from a single multi-class
@@ -2438,30 +2450,45 @@ async function createApp() {
     } catch (e) { console.error(e); res.status(500).send('<h2>Something went wrong. Please try again.</h2>'); }
   });
 
-  // Cron endpoint — called daily by Vercel cron to send 24hr reminders
+  // Cron endpoint — runs hourly. Sends a '23 hour' reminder to anyone
+  // booked for a class starting in the next 22-24 hours who hasn't already
+  // had a reminder. The window is 22-24h (not exactly 23) so a slow cron
+  // tick never misses a class, and reminder_sent_at guards against doubles.
   app.get('/api/cron/reminders', async (req, res) => {
     if (req.headers['authorization'] !== `Bearer ${process.env.CRON_SECRET}`) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     try {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().slice(0, 10);
       const { rows } = await pool.query(`
         SELECT r.id, r."firstName", r.email, c.title, c.date, c.time, c.instructor, c.duration
         FROM registrations r
         JOIN classes c ON c.id = r."classId"
-        WHERE c.date = $1
-      `, [tomorrowStr]);
+        WHERE r.reminder_sent_at IS NULL
+          AND (c.date || 'T' || c.time)::timestamp - NOW() BETWEEN INTERVAL '22 hours' AND INTERVAL '24 hours'
+      `);
       let sent = 0;
+      const ids = [];
       for (const row of rows) {
-        await sendReminderEmail({
-          to: row.email, firstName: row.firstName, registrationId: row.id,
-          cls: { title: row.title, date: row.date, time: row.time, instructor: row.instructor, duration: row.duration }
-        }).catch(e => console.error(`Reminder failed for ${row.email}:`, e.message));
-        sent++;
+        try {
+          await sendReminderEmail({
+            to: row.email, firstName: row.firstName, registrationId: row.id,
+            cls: { title: row.title, date: row.date, time: row.time, instructor: row.instructor, duration: row.duration }
+          });
+          ids.push(row.id);
+          sent++;
+        } catch (e) {
+          console.error(`Reminder failed for ${row.email}:`, e.message);
+        }
       }
-      res.json({ success: true, remindersSent: sent, date: tomorrowStr });
+      if (ids.length) {
+        // Stamp reminder_sent_at only for successfully-sent rows so a
+        // transient email error retries next hour instead of being lost
+        await pool.query(
+          `UPDATE registrations SET reminder_sent_at = NOW() WHERE id = ANY($1)`,
+          [ids]
+        );
+      }
+      res.json({ success: true, remindersSent: sent, candidates: rows.length });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
