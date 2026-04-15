@@ -11,8 +11,10 @@
   <meta name="twitter:card" content="summary">
   <meta name="twitter:image" content="https://pilates-studio-inky.vercel.app/images/logo.png">
   <link rel="stylesheet" href="css/styles.css?v=3">
-  <!-- Chart.js (loaded once, used only on the Analytics view) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <!-- Chart.js (loaded once, used only on the Analytics view).
+       async (not defer) so it starts downloading immediately in parallel
+       with everything else but doesn't block the parser. -->
+  <script async src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     .admin-card-header {
       cursor: pointer;
@@ -336,6 +338,14 @@
       font-weight: 700;
       color: var(--charcoal);
       margin: 0 0 0.75rem;
+    }
+    /* Canvas needs a fixed-height positioned container so Chart.js with
+       maintainAspectRatio: false doesn't blow the canvas up to fill the
+       viewport when data is sparse (e.g. only 1 month on record). */
+    .chart-box {
+      position: relative;
+      height: 260px;
+      width: 100%;
     }
 
     /* ===== Mobile: sidebar becomes overlay ===== */
@@ -734,19 +744,19 @@
             <div class="chart-grid">
               <div class="chart-cell">
                 <h4>Bookings over time</h4>
-                <canvas id="chartBookings" height="200"></canvas>
+                <div class="chart-box"><canvas id="chartBookings"></canvas></div>
               </div>
               <div class="chart-cell">
                 <h4>Revenue over time (collected vs. outstanding)</h4>
-                <canvas id="chartRevenue" height="200"></canvas>
+                <div class="chart-box"><canvas id="chartRevenue"></canvas></div>
               </div>
               <div class="chart-cell">
                 <h4>Most popular classes</h4>
-                <canvas id="chartPopularClasses" height="200"></canvas>
+                <div class="chart-box"><canvas id="chartPopularClasses"></canvas></div>
               </div>
               <div class="chart-cell">
                 <h4>Most popular time slots</h4>
-                <canvas id="chartPopularTimes" height="200"></canvas>
+                <div class="chart-box"><canvas id="chartPopularTimes"></canvas></div>
               </div>
             </div>
 
@@ -1029,9 +1039,9 @@ function renderAnalytics(d) {
     data: {
       labels: monthLabels,
       datasets: [
-        { label: 'Drop-in', data: d.bookingsOverTime.map(r => r.single), backgroundColor: grey,  stack: 's' },
-        { label: '4-Pack',  data: d.bookingsOverTime.map(r => r.pack4),  backgroundColor: red,   stack: 's' },
-        { label: 'Credit',  data: d.bookingsOverTime.map(r => r.credit), backgroundColor: cream, stack: 's' }
+        { label: 'Drop-in', data: d.bookingsOverTime.map(r => r.single), backgroundColor: grey,  stack: 's', maxBarThickness: 48 },
+        { label: '4-Pack',  data: d.bookingsOverTime.map(r => r.pack4),  backgroundColor: red,   stack: 's', maxBarThickness: 48 },
+        { label: 'Credit',  data: d.bookingsOverTime.map(r => r.credit), backgroundColor: cream, stack: 's', maxBarThickness: 48 }
       ]
     },
     options: commonChartOpts({ stacked: true })
@@ -1044,8 +1054,8 @@ function renderAnalytics(d) {
     data: {
       labels: revLabels,
       datasets: [
-        { label: 'Collected',   data: d.revenueOverTime.map(r => r.collected),   backgroundColor: red,     stack: 'r' },
-        { label: 'Outstanding', data: d.revenueOverTime.map(r => r.outstanding), backgroundColor: '#ffc29a', stack: 'r' }
+        { label: 'Collected',   data: d.revenueOverTime.map(r => r.collected),   backgroundColor: red,     stack: 'r', maxBarThickness: 48 },
+        { label: 'Outstanding', data: d.revenueOverTime.map(r => r.outstanding), backgroundColor: '#ffc29a', stack: 'r', maxBarThickness: 48 }
       ]
     },
     options: commonChartOpts({ stacked: true, currency: true })
@@ -1056,9 +1066,9 @@ function renderAnalytics(d) {
     type: 'bar',
     data: {
       labels: d.popularByTitle.map(r => r.label || '(unknown)'),
-      datasets: [{ label: 'Bookings', data: d.popularByTitle.map(r => r.count), backgroundColor: red }]
+      datasets: [{ label: 'Bookings', data: d.popularByTitle.map(r => r.count), backgroundColor: red, maxBarThickness: 24 }]
     },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
       plugins: { legend: { display: false } },
       scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
   });
@@ -1068,9 +1078,9 @@ function renderAnalytics(d) {
     type: 'bar',
     data: {
       labels: d.popularByTime.map(r => formatTime(r.label || '00:00')),
-      datasets: [{ label: 'Bookings', data: d.popularByTime.map(r => r.count), backgroundColor: cream }]
+      datasets: [{ label: 'Bookings', data: d.popularByTime.map(r => r.count), backgroundColor: cream, maxBarThickness: 24 }]
     },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
       plugins: { legend: { display: false } },
       scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
   });
@@ -1080,6 +1090,7 @@ function commonChartOpts({ stacked = false, currency = false } = {}) {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    animation: false,
     plugins: {
       legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
       tooltip: currency ? {
