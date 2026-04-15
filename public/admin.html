@@ -121,7 +121,25 @@
       border-bottom: 1px solid var(--border);
       margin: 0 0 1rem;
     }
-    .admin-sidebar-nav { display: flex; flex-direction: column; gap: 4px; padding: 0 0.75rem; }
+    /* Reset the global <nav> rule (sticky top bar styling) so it doesn't
+       bleed into the admin sidebar's <nav> — otherwise the inherited
+       border-bottom + height:120px draw a horizontal line across the
+       sidebar, and align-items:center pushes items to the middle. */
+    .admin-sidebar-nav {
+      display: flex !important;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      gap: 4px;
+      padding: 0 0.75rem;
+      position: static;
+      height: auto;
+      top: auto;
+      z-index: auto;
+      background: none;
+      backdrop-filter: none;
+      border: none;
+    }
     .admin-sidebar-nav a {
       display: flex;
       align-items: center;
