@@ -2331,6 +2331,7 @@ function loadRoster() {
           <th style="padding:8px 12px">Name</th>
           <th style="padding:8px 12px">Email</th>
           <th style="padding:8px 12px">Phone</th>
+          <th style="padding:8px 12px">Experience</th>
           <th style="padding:8px 12px">Registered</th>
           <th style="padding:8px 12px">Payment</th>
           <th style="padding:8px 12px"></th>
@@ -2347,6 +2348,7 @@ function loadRoster() {
             <td style="padding:10px 12px;font-weight:600">${r.firstName} ${r.lastName}</td>
             <td style="padding:10px 12px"><a href="mailto:${r.email}" style="color:var(--red)">${r.email}</a></td>
             <td style="padding:10px 12px;color:var(--mid)">${r.phone || '—'}</td>
+            <td style="padding:10px 12px;color:var(--mid);font-size:0.82rem">${({first_class:'First class',under_5:'< 5 classes',over_5:'5+ classes'})[r.pilatesExperience] || '—'}</td>
             <td style="padding:10px 12px;color:var(--mid);white-space:nowrap">${new Date(r.registeredAt).toLocaleDateString('en-CA')}</td>
             <td style="padding:10px 12px">${payBadge}</td>
             <td style="padding:10px 12px;text-align:right;display:flex;gap:0.4rem;justify-content:flex-end">

@@ -56,6 +56,21 @@ window.safeReturnTo = function (raw, fallback) {
           bottomNav.appendChild(adminLink);
         }
       }
+      // Add Sign Out link to mobile bottom-nav
+      var bottomNavOut = document.querySelector('.bottom-nav');
+      if (bottomNavOut) {
+        var signOutLink = document.createElement('a');
+        signOutLink.href = '#';
+        signOutLink.innerHTML =
+          '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1"/></svg>' +
+          'Sign Out';
+        signOutLink.addEventListener('click', async function (e) {
+          e.preventDefault();
+          await fetch('/auth/logout', { method: 'POST' });
+          window.location.reload();
+        });
+        bottomNavOut.appendChild(signOutLink);
+      }
     } else {
       li.innerHTML = `<a href="login.html">Sign In</a>`;
     }

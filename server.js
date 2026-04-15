@@ -2107,8 +2107,12 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
   app.get('/api/registrations', requireAdmin, async (req, res) => {
     try {
       const { rows } = await pool.query(`
-        SELECT r.*, c.title, c.date, c.time, c.instructor
-        FROM registrations r LEFT JOIN classes c ON c.id = r."classId"
+        SELECT r.*, c.title, c.date, c.time, c.instructor,
+               w.pilates_experience
+        FROM registrations r
+        LEFT JOIN classes c ON c.id = r."classId"
+        LEFT JOIN waivers w ON (r.user_id IS NOT NULL AND w.user_id = r.user_id)
+                             OR (r.user_id IS NULL AND LOWER(w.email) = LOWER(r.email))
         ORDER BY r."registeredAt" DESC
       `);
       const enriched = rows.map(r => ({
@@ -2116,6 +2120,7 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
         lastName: r.lastName, email: r.email, phone: r.phone,
         registeredAt: r.registeredAt, paymentStatus: r.payment_status,
         packageType: r.package_type || 'single', userId: r.user_id, batchId: r.batch_id,
+        pilatesExperience: r.pilates_experience || '',
         class: r.title ? { title: r.title, date: r.date, time: r.time, instructor: r.instructor } : null
       }));
       res.json(enriched);
