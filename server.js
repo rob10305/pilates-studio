@@ -433,30 +433,6 @@ async function initDB() {
     ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_alert_sent BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 
-  // One-time cleanup: remove past classes that were previously seeded
-  await pool.query(`DELETE FROM registrations WHERE "classId" IN ('1010','1011','1015')`);
-  await pool.query(`DELETE FROM classes WHERE id IN ('1010','1011','1015')`);
-
-  // Ensure current/future classes exist (upsert — past dates removed)
-  const aprilClasses = [
-    ['1012','Mat Pilates','Amanda','2026-04-16','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ['1013','Mat Pilates','Amanda','2026-04-23','08:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ['1018','Mat Pilates','Amanda','2026-04-23','09:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ['1014','Mat Pilates','Amanda','2026-04-30','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ['1016','Mat Pilates','Amanda','2026-04-16','12:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ['1017','Mat Pilates','Amanda','2026-04-30','12:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
-  ];
-  for (const row of aprilClasses) {
-    await pool.query(`
-      INSERT INTO classes (id,title,instructor,date,time,duration,capacity,description)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-      ON CONFLICT (id) DO NOTHING
-    `, row);
-  }
-
-  // One-time fix: update class 1013 from 11:00 to 08:00
-  await pool.query(`UPDATE classes SET time='08:00' WHERE id='1013' AND time='11:00'`);
-
 }
 
 // --- App factory (shared by Railway server and Vercel serverless) ---
