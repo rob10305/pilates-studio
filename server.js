@@ -433,15 +433,16 @@ async function initDB() {
     ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_alert_sent BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 
-  // Ensure April classes exist (upsert)
+  // One-time cleanup: remove past classes that were previously seeded
+  await pool.query(`DELETE FROM registrations WHERE "classId" IN ('1010','1011','1015')`);
+  await pool.query(`DELETE FROM classes WHERE id IN ('1010','1011','1015')`);
+
+  // Ensure current/future classes exist (upsert — past dates removed)
   const aprilClasses = [
-    ['1010','Mat Pilates','Amanda','2026-04-02','11:00',50,12,'Private Booking'],
-    ['1011','Mat Pilates','Amanda','2026-04-09','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1012','Mat Pilates','Amanda','2026-04-16','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1013','Mat Pilates','Amanda','2026-04-23','08:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1018','Mat Pilates','Amanda','2026-04-23','09:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1014','Mat Pilates','Amanda','2026-04-30','11:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
-    ['1015','Mat Pilates','Amanda','2026-04-09','12:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1016','Mat Pilates','Amanda','2026-04-16','12:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
     ['1017','Mat Pilates','Amanda','2026-04-30','12:00',50,12,'Classic mat-based Pilates for full-body conditioning.'],
   ];
@@ -456,20 +457,6 @@ async function initDB() {
   // One-time fix: update class 1013 from 11:00 to 08:00
   await pool.query(`UPDATE classes SET time='08:00' WHERE id='1013' AND time='11:00'`);
 
-  // Make April 2 class appear full by inserting 12 placeholder registrations
-  try {
-    const { rows: apr2Regs } = await pool.query(`SELECT COUNT(*)::int AS n FROM registrations WHERE "classId" = '1010'`);
-    const apr2Count = apr2Regs[0].n;
-    if (apr2Count < 12) {
-      for (let i = apr2Count + 1; i <= 12; i++) {
-        await pool.query(
-          `INSERT INTO registrations (id, "classId", "firstName", "lastName", email, phone, "registeredAt") VALUES ($1,$2,$3,$4,$5,$6,$7)
-           ON CONFLICT (id) DO NOTHING`,
-          [`apr2-placeholder-${i}`, '1010', 'Reserved', 'Spot', `reserved${i}@placeholder.local`, '', new Date().toISOString()]
-        );
-      }
-    }
-  } catch (e) { console.error('April 2 placeholder error (non-fatal):', e.message); }
 }
 
 // --- App factory (shared by Railway server and Vercel serverless) ---

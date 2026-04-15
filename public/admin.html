@@ -171,10 +171,10 @@
         </div>
       </div>
 
-      <!-- Upcoming Classes (collapsed) -->
+      <!-- All Classes (collapsed) -->
       <div class="admin-card collapsed" id="card-upcoming">
         <div class="admin-card-header" onclick="toggleCard('card-upcoming')">
-          <h3>Upcoming Classes</h3>
+          <h3>All Classes</h3>
           <span id="classCount" class="badge-count">0</span>
           <span class="collapse-toggle">&#9660;</span>
         </div>
@@ -351,30 +351,31 @@ function renderUpcomingClasses(classes, registrations) {
   const count = document.getElementById('classCount');
 
   const now = new Date();
-  const upcoming = classes
+  const sorted = classes
     .map(c => ({...c, regCount: registrations.filter(r => r.classId === c.id).length}))
-    .filter(c => new Date(`${c.date}T${c.time}`) >= now)
     .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
 
-  count.textContent = upcoming.length;
+  count.textContent = sorted.length;
 
-  if (upcoming.length === 0) {
-    list.innerHTML = '<div class="empty-state"><p>No upcoming classes.</p></div>';
+  if (sorted.length === 0) {
+    list.innerHTML = '<div class="empty-state"><p>No classes found.</p></div>';
     return;
   }
 
-  list.innerHTML = upcoming.map(c => `
-    <div class="admin-class-item">
+  list.innerHTML = sorted.map(c => {
+    const isPast = new Date(`${c.date}T${c.time}`) < now;
+    return `
+    <div class="admin-class-item" style="${isPast ? 'opacity:0.55' : ''}">
       <div class="admin-class-info">
-        <h4>${c.title}</h4>
+        <h4>${c.title}${isPast ? ' <span style="font-size:0.72rem;font-weight:400;color:var(--mid)">(past)</span>' : ''}</h4>
         <p>${formatDate(c.date)} at ${formatTime(c.time)} · ${c.instructor} · ${c.regCount}/${c.capacity} booked</p>
       </div>
       <div style="display:flex;gap:0.4rem">
-        <button style="background:#e3f2fd;color:#1565c0;border:none;padding:0.35rem 0.8rem;border-radius:6px;font-size:0.78rem;font-weight:700;cursor:pointer" onclick="editClass('${c.id}')">Edit</button>
+        ${!isPast ? `<button style="background:#e3f2fd;color:#1565c0;border:none;padding:0.35rem 0.8rem;border-radius:6px;font-size:0.78rem;font-weight:700;cursor:pointer" onclick="editClass('${c.id}')">Edit</button>` : ''}
         <button class="btn-danger" onclick="deleteClass('${c.id}')">Delete</button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderRegistrations(registrations) {
