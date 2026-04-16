@@ -688,6 +688,50 @@ async function sendNewBookingNotification({ notifyEmail, registrant, cls }) {
   });
 }
 
+// Admin-facing notification sent when a user cancels their own booking
+// (via the My Schedule portal or the email cancellation link). Surfaces the
+// refund obligation so the admin knows whether an e-Transfer is owed, a
+// credit was returned, or no action is required.
+async function sendCancellationNotification({ notifyEmail, registrant, cls, refundType, cancelledBy }) {
+  if (!notifyEmail || !process.env.RESEND_API_KEY) return;
+  const refundLabel =
+    refundType === 'cash'   ? '$25 e-Transfer refund owed'
+  : refundType === 'credit' ? '1 class credit returned to guest'
+  :                           'No refund or credit (within 24h of class)';
+  const sourceLabel =
+    cancelledBy === 'email-link' ? 'Email cancellation link'
+  : cancelledBy === 'user'       ? 'My Schedule portal'
+  : (cancelledBy || 'Self-cancellation');
+  const actionNote = refundType === 'cash'
+    ? `<p style="font-size:13px;color:#6b6b6b;margin:0"><strong>Action required:</strong> send the $25 e-Transfer refund within 2–3 business days.</p>`
+    : refundType === 'credit'
+    ? `<p style="font-size:13px;color:#6b6b6b;margin:0">1 class credit has been automatically returned to the guest's account. The spot is now open for other guests.</p>`
+    : `<p style="font-size:13px;color:#6b6b6b;margin:0">No refund or credit is due (cancellation was within 24 hours of class start). The spot is now open for other guests.</p>`;
+  await getResend().emails.send({
+    from: FROM_ADDRESS,
+    to: notifyEmail,
+    subject: `Booking Cancelled: ${registrant.firstName} ${registrant.lastName} — ${cls.title}`,
+    html: emailWrap({
+      heading: 'Class Booking Cancelled',
+      subtitle: `${registrant.firstName} ${registrant.lastName} has cancelled their booking for ${cls.title}.`,
+      detailRows: [
+        ['Name',          `${registrant.firstName} ${registrant.lastName}`],
+        ['Email',         registrant.email],
+        ['Phone',         registrant.phone || '—'],
+        ['Class',         cls.title],
+        ['Date',          formatClassDate(cls.date)],
+        ['Time',          formatClassTime(cls.time)],
+        ['Instructor',    cls.instructor || 'Amanda'],
+        ['Refund action', refundLabel],
+        ['Cancelled via', sourceLabel]
+      ],
+      body: actionNote,
+      buttonLabel: 'Open Admin Dashboard',
+      buttonUrl: `${APP_URL}/admin.html`
+    })
+  });
+}
+
 async function sendCreditBookingEmail({ to, firstName, cls, creditsRemaining }) {
   if (!process.env.RESEND_API_KEY) return;
   await getResend().emails.send({
@@ -2243,6 +2287,16 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
         cls: { title: reg.title, date: reg.date, time: reg.time, instructor: reg.instructor },
         refundType
       }).catch(e => console.error('Cancellation email error:', e.message));
+      // Admin notification — fire-and-forget after response
+      getSetting('booking_notify_email').then(notifyEmail => {
+        if (notifyEmail) sendCancellationNotification({
+          notifyEmail,
+          registrant: { firstName: reg.firstName, lastName: reg.lastName, email: reg.email, phone: reg.phone },
+          cls: { title: reg.title, date: reg.date, time: reg.time, instructor: reg.instructor },
+          refundType,
+          cancelledBy: 'user'
+        }).catch(e => console.error('Admin cancellation notify error:', e.message));
+      });
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
@@ -2799,6 +2853,17 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
         refundType
       }).catch(e => console.error('Cancellation email error:', e.message));
 
+      // Admin notification — fire-and-forget
+      getSetting('booking_notify_email').then(notifyEmail => {
+        if (notifyEmail) sendCancellationNotification({
+          notifyEmail,
+          registrant: { firstName: reg.firstName, lastName: reg.lastName, email: reg.email, phone: reg.phone },
+          cls: { title: reg.title, date: reg.date, time: reg.time, instructor: reg.instructor },
+          refundType,
+          cancelledBy: 'email-link'
+        }).catch(e => console.error('Admin cancellation notify error:', e.message));
+      });
+
       const policyLink = `<a href="${APP_URL}/cancellation-policy.html" style="color:#820000">Cancellation Policy</a>`;
       const refundNote =
         refundType === 'cash'   ? 'As you cancelled more than 24 hours before the class, your $25 payment will be refunded within 2–3 business days.'
@@ -3196,6 +3261,9 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
           break;
         case 'payment_alert_admin':
           await sendAdminPaymentAlertEmail({ notifyEmail: testEmail, unpaidList: [{ reg: { id: sampleRegId, firstName: 'Test', lastName: 'User', email: 'test@example.com', phone: '555-0000', registeredAt: new Date().toISOString() }, cls: sampleCls }] });
+          break;
+        case 'cancellation_admin':
+          await sendCancellationNotification({ notifyEmail: testEmail, registrant: { firstName: 'Test', lastName: 'User', email: 'test@example.com', phone: '555-0000' }, cls: sampleCls, refundType: 'cash', cancelledBy: 'user' });
           break;
         default:
           return res.status(400).json({ error: 'Unknown email type.' });
