@@ -2753,7 +2753,59 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
   });
 
   // Cancel registration via email link
+  // Step 1: GET shows a confirmation page with a "Confirm cancellation" button
+  // that POSTs to the same URL. This protects against email-link scanners
+  // (Microsoft Defender SafeLinks, Gmail link preview, etc.) which auto-fetch
+  // URLs in emails and would otherwise trigger a cancellation before the user
+  // ever sees the email.
   app.get('/api/registrations/:id/cancel', async (req, res) => {
+    const { id } = req.params;
+    const { token } = req.query;
+    if (!token || token !== cancelToken(id))
+      return res.status(400).send('<h2>Invalid or expired cancellation link.</h2>');
+    try {
+      const { rows } = await pool.query(`
+        SELECT r.*, c.date, c.time, c.title, c.instructor
+        FROM registrations r JOIN classes c ON c.id = r."classId"
+        WHERE r.id = $1
+      `, [id]);
+      if (rows.length === 0) {
+        return res.send(emailWrap({
+          heading: 'Already Cancelled',
+          subtitle: 'This booking has already been cancelled.',
+          buttonLabel: 'Back to Red Maple Movement',
+          buttonUrl: APP_URL
+        }));
+      }
+      const reg = rows[0];
+
+      // Show confirmation page — no DB changes happen here
+      return res.send(emailWrap({
+        heading: 'Cancel Your Booking?',
+        subtitle: `Please confirm you want to cancel your spot for ${reg.title}.`,
+        detailRows: [
+          ['Class', reg.title],
+          ['Date', formatClassDate(reg.date)],
+          ['Time', formatClassTime(reg.time)],
+        ],
+        body: `
+          <p style="font-size:14px;color:#6b6b6b;margin-bottom:20px">
+            Click the button below to confirm. If you didn't mean to cancel, you can safely close this page — nothing has changed yet.
+          </p>
+          <form method="POST" action="${APP_URL}/api/registrations/${id}/cancel?token=${token}" style="text-align:center">
+            <button type="submit" style="background:#820000;color:#fff;border:none;padding:12px 32px;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">
+              Yes, cancel my booking
+            </button>
+          </form>`,
+        buttonLabel: 'Keep my booking',
+        buttonUrl: `${APP_URL}/my-schedule.html`
+      }));
+    } catch (e) { console.error(e); res.status(500).send('<h2>Something went wrong. Please try again.</h2>'); }
+  });
+
+  // Step 2: POST actually performs the cancellation. Safe from email scanners
+  // since they never issue POSTs.
+  app.post('/api/registrations/:id/cancel', async (req, res) => {
     const { id } = req.params;
     const { token } = req.query;
     if (!token || token !== cancelToken(id))
@@ -2901,8 +2953,24 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
     } catch (e) { console.error(e); res.status(500).json({ error: 'Server error' }); }
   });
 
-  // Admin payment action — confirm payment received
+  // Admin payment action — confirm payment received.
+  // GET renders a confirmation page; POST performs the mutation. This prevents
+  // email link scanners (SafeLinks, Gmail preview) from auto-firing the action.
   app.get('/api/admin/payment-action/:id/confirm', async (req, res) => {
+    const { id } = req.params;
+    const { token } = req.query;
+    if (token !== paymentActionToken(id, 'confirm')) {
+      return res.status(403).send(actionPage('Invalid or expired link.', false));
+    }
+    res.send(adminActionConfirmPage({
+      id, token, action: 'confirm',
+      heading: 'Confirm Payment Received?',
+      description: 'Click the button below to mark this booking as paid and send a confirmation email to the student.',
+      buttonLabel: '✅ Yes, mark as paid',
+      buttonColor: '#2d6a2d'
+    }));
+  });
+  app.post('/api/admin/payment-action/:id/confirm', async (req, res) => {
     const { id } = req.params;
     const { token } = req.query;
     if (token !== paymentActionToken(id, 'confirm')) {
@@ -2925,8 +2993,23 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
     } catch (e) { console.error(e); res.status(500).send(actionPage('Server error. Please try again.', false)); }
   });
 
-  // Admin payment action — no payment received, remove from class
+  // Admin payment action — no payment received, remove from class.
+  // GET renders a confirmation page; POST performs the mutation.
   app.get('/api/admin/payment-action/:id/release', async (req, res) => {
+    const { id } = req.params;
+    const { token } = req.query;
+    if (token !== paymentActionToken(id, 'release')) {
+      return res.status(403).send(actionPage('Invalid or expired link.', false));
+    }
+    res.send(adminActionConfirmPage({
+      id, token, action: 'release',
+      heading: 'Remove Booking — No Payment?',
+      description: 'Click the button below to remove this booking from the class and send a release notification email to the student.',
+      buttonLabel: '❌ Yes, remove booking',
+      buttonColor: '#820000'
+    }));
+  });
+  app.post('/api/admin/payment-action/:id/release', async (req, res) => {
     const { id } = req.params;
     const { token } = req.query;
     if (token !== paymentActionToken(id, 'release')) {
@@ -2951,6 +3034,24 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
       res.send(actionPage(`❌ Booking removed for ${reg.firstName} ${reg.lastName}. A notification email has been sent to ${reg.email}.`, true));
     } catch (e) { console.error(e); res.status(500).send(actionPage('Server error. Please try again.', false)); }
   });
+
+  function adminActionConfirmPage({ id, token, action, heading, description, buttonLabel, buttonColor }) {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Red Maple Movement — Admin Action</title>
+      <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5}
+      .card{background:#fff;border-radius:8px;padding:40px;max-width:480px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.1)}
+      h1{color:#820000;margin-top:0}
+      p{color:#6b6b6b;font-size:15px;line-height:1.5}
+      button{background:${buttonColor};color:#fff;border:none;padding:14px 32px;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px}
+      .back{color:#820000;text-decoration:none;font-size:14px;display:inline-block;margin-top:20px}</style>
+      </head><body><div class="card">
+      <h1>${escapeHtml(heading)}</h1>
+      <p>${escapeHtml(description)}</p>
+      <form method="POST" action="${APP_URL}/api/admin/payment-action/${encodeURIComponent(id)}/${action}?token=${encodeURIComponent(token)}">
+        <button type="submit">${buttonLabel}</button>
+      </form>
+      <a href="${APP_URL}/admin.html" class="back">← Back to admin</a>
+      </div></body></html>`;
+  }
 
   function actionPage(message, success) {
     const color = success ? '#2d6a2d' : '#820000';
