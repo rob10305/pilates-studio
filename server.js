@@ -2633,6 +2633,39 @@ ${JSON.stringify(jsonLdEvents, null, 2)}
   });
 
   // Admin: mark a registration as paid
+  // Admin: manually create a pending registration. Used to recreate a
+  // booking that was lost (e.g. to the SafeLinks auto-cancel bug) or to
+  // enter a booking taken by phone / in-person. Skips duplicate + capacity
+  // guards only loosely — if class is full the admin can still push it.
+  app.post('/api/admin/registrations/manual', requireAdmin, async (req, res) => {
+    const { firstName, lastName, email, phone, classId, packageType } = req.body || {};
+    if (!firstName || !lastName || !email || !classId) {
+      return res.status(400).json({ error: 'firstName, lastName, email, and classId are required' });
+    }
+    const pkgType = packageType === '4pack' ? '4pack' : 'single';
+    try {
+      const { rows: clsRows } = await pool.query('SELECT * FROM classes WHERE id = $1', [classId]);
+      if (clsRows.length === 0) return res.status(404).json({ error: 'Class not found' });
+      const { rows: dupRows } = await pool.query(
+        'SELECT id FROM registrations WHERE "classId" = $1 AND LOWER(email) = LOWER($2)',
+        [classId, email]
+      );
+      if (dupRows.length > 0) return res.status(409).json({ error: 'A booking for this email + class already exists. Check Pending Payments or Class Roster.' });
+      // Link to an existing user account if one exists for this email
+      const { rows: userRows } = await pool.query(
+        'SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]
+      );
+      const userId = userRows.length ? userRows[0].id : null;
+      const registrationId = Date.now().toString();
+      await pool.query(
+        `INSERT INTO registrations (id,"classId","firstName","lastName",email,phone,"registeredAt",payment_status,package_type,user_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9)`,
+        [registrationId, classId, firstName.trim(), lastName.trim(), email.trim(), phone || '', new Date().toISOString(), pkgType, userId]
+      );
+      res.status(201).json({ success: true, registrationId });
+    } catch (e) { console.error('Manual registration error:', e); res.status(500).json({ error: 'Server error' }); }
+  });
+
   app.post('/api/admin/registrations/:id/mark-paid', requireAdmin, async (req, res) => {
     try {
       // Step 1 — look up the registration to check if it's part of a batch.

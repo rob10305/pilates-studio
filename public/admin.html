@@ -603,11 +603,43 @@
         <div class="admin-card-header" onclick="toggleCard('card-pending')">
           <h3>💳 Pending Payments</h3>
           <span id="pendingCount" class="badge-count">0</span>
+          <button type="button" onclick="event.stopPropagation(); openManualBookingModal()"
+                  style="background:var(--red);color:#fff;border:none;padding:0.4rem 0.85rem;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;margin-right:0.5rem">
+            + Add Manual Booking
+          </button>
           <span class="collapse-toggle">&#9660;</span>
         </div>
         <div class="admin-card-body">
           <div id="pendingList">
             <div class="empty-state"><p>Loading…</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manual Booking Modal -->
+      <div id="manualBookingModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:1rem">
+        <div style="background:#fff;border-radius:12px;padding:2rem;max-width:480px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,0.2)">
+          <h3 style="margin-top:0">Add Manual Pending Booking</h3>
+          <p style="color:var(--mid);font-size:0.9rem;margin-bottom:1.25rem">Use this to recreate a booking that was lost or to manually add one. It will appear in Pending Payments so you can mark it paid and trigger the normal email workflow.</p>
+          <div style="display:grid;gap:0.75rem">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
+              <input id="manualFirstName" placeholder="First name" style="padding:0.6rem;border:1px solid var(--border);border-radius:6px">
+              <input id="manualLastName" placeholder="Last name" style="padding:0.6rem;border:1px solid var(--border);border-radius:6px">
+            </div>
+            <input id="manualEmail" type="email" placeholder="Email" style="padding:0.6rem;border:1px solid var(--border);border-radius:6px">
+            <input id="manualPhone" placeholder="Phone (optional)" style="padding:0.6rem;border:1px solid var(--border);border-radius:6px">
+            <select id="manualClassId" style="padding:0.6rem;border:1px solid var(--border);border-radius:6px">
+              <option value="">— Select class —</option>
+            </select>
+            <select id="manualPackageType" style="padding:0.6rem;border:1px solid var(--border);border-radius:6px">
+              <option value="single">Drop-in ($25)</option>
+              <option value="4pack">4-Pack ($85)</option>
+            </select>
+          </div>
+          <div id="manualAlert" style="display:none;margin-top:0.75rem;padding:0.6rem;border-radius:6px;font-size:0.85rem"></div>
+          <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1.25rem">
+            <button type="button" onclick="closeManualBookingModal()" style="background:#eee;color:var(--charcoal);border:none;padding:0.6rem 1.2rem;border-radius:6px;font-weight:700;cursor:pointer">Cancel</button>
+            <button type="button" onclick="submitManualBooking()" style="background:var(--red);color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:6px;font-weight:700;cursor:pointer">Create Booking</button>
           </div>
         </div>
       </div>
@@ -1726,6 +1758,68 @@ function renderPendingPayments(classes, registrations) {
       </tbody>
     </table>
     <p style="margin-top:0.75rem;font-size:0.8rem;color:var(--mid)">${pending.length} pending payment${pending.length !== 1 ? 's' : ''} · Mark Paid sends a payment confirmation email · Remove sends a cancellation email.</p>`;
+}
+
+// ===== Manual Booking Modal =====
+function openManualBookingModal() {
+  const modal = document.getElementById('manualBookingModal');
+  const select = document.getElementById('manualClassId');
+  // Populate class dropdown with upcoming classes only
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = (allClasses || [])
+    .filter(c => c.date >= today)
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  select.innerHTML = '<option value="">— Select class —</option>' +
+    upcoming.map(c => `<option value="${c.id}">${formatDate(c.date)} ${formatTime(c.time)} — ${c.title}</option>`).join('');
+  // Reset form
+  ['manualFirstName', 'manualLastName', 'manualEmail', 'manualPhone'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('manualPackageType').value = 'single';
+  document.getElementById('manualAlert').style.display = 'none';
+  modal.style.display = 'flex';
+}
+
+function closeManualBookingModal() {
+  document.getElementById('manualBookingModal').style.display = 'none';
+}
+
+async function submitManualBooking() {
+  const firstName = document.getElementById('manualFirstName').value.trim();
+  const lastName  = document.getElementById('manualLastName').value.trim();
+  const email     = document.getElementById('manualEmail').value.trim();
+  const phone     = document.getElementById('manualPhone').value.trim();
+  const classId   = document.getElementById('manualClassId').value;
+  const packageType = document.getElementById('manualPackageType').value;
+  const alertBox  = document.getElementById('manualAlert');
+
+  if (!firstName || !lastName || !email || !classId) {
+    alertBox.className = 'alert alert-error';
+    alertBox.style.cssText = 'display:block;margin-top:0.75rem;padding:0.6rem;border-radius:6px;font-size:0.85rem;background:#f8d7da;color:#721c24';
+    alertBox.textContent = 'Please fill in name, email, and class.';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/admin/registrations/manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName, lastName, email, phone, classId, packageType })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alertBox.style.cssText = 'display:block;margin-top:0.75rem;padding:0.6rem;border-radius:6px;font-size:0.85rem;background:#f8d7da;color:#721c24';
+      alertBox.textContent = data.error || 'Could not create booking.';
+      return;
+    }
+    closeManualBookingModal();
+    const dashAlert = document.getElementById('dashboardAlert');
+    dashAlert.className = 'alert alert-success';
+    dashAlert.textContent = `Manual pending booking created for ${firstName} ${lastName}. Mark Paid when payment is received to trigger the confirmation email.`;
+    dashAlert.style.display = 'block';
+    loadDashboard();
+  } catch (_) {
+    alertBox.style.cssText = 'display:block;margin-top:0.75rem;padding:0.6rem;border-radius:6px;font-size:0.85rem;background:#f8d7da;color:#721c24';
+    alertBox.textContent = 'Network error. Please try again.';
+  }
 }
 
 async function markPaidFromPending(regId, name, packageType) {
